@@ -14,7 +14,7 @@ Toda la app es un solo archivo, `index.html`, publicado con GitHub Pages. No tie
 | Consultas reales de JobTread sin IA | Grant Key de JobTread; no necesita Claude |
 | Preguntas conversacionales abiertas y análisis con IA | Llave de Claude opcional (API con créditos, diferente de Claude Pro) |
 | Proyectos y tareas de JobTread | Grant Key; los proyectos fijos (`id|Nombre,id|Nombre`) son opcionales |
-| Voz de ElevenLabs | Llave y Voice ID de ElevenLabs (opcional; si no, usa la voz del dispositivo) |
+| Voz de ElevenAgents (recomendada) | No requiere API Key en el navegador; usa agente separado para Jarvis y el Voice ID configurado en la cuenta ElevenLabs |\n| ElevenLabs TTS clásico (opcional) | Una API Key y Voice ID introducidos manualmente en Ajustes |
 | Escucharte | Safari en iPhone, Chrome o Edge |
 
 Después de pegar las llaves, toca **Probar conexiones**: dice qué funciona en ese dispositivo.
@@ -74,3 +74,16 @@ Preguntas de ejemplo:
 Sin Claude, el sistema interpreta algunas intenciones y ejecuta consultas Pave fijas de **solo lectura**. Muestra tarjetas con datos efectivamente recibidos. No genera respuestas libres con IA ni cifras financieras. Si no aparece un proyecto en los primeros 40, no se afirma que no exista.
 
 **Seguridad:** no publiques ni compartas el Grant Key. En el piloto de GitHub Pages se almacena en `localStorage` del dispositivo y se envía directamente a `api.jobtread.com/pave`; evita equipos compartidos y permisos excesivos. ElevenLabs recibe los textos de las respuestas que narra, así que evita hablar en voz alta datos confidenciales que no quieras enviar al proveedor. Para producción, utiliza el servidor protegido, autenticación por usuario y llaves fuera del navegador.
+
+
+## Voz ElevenAgents — sin llave de API en el dispositivo
+
+El orbe puede iniciar una conversación real con el agente privado de propósito **Jarvis — MTD Voice Pilot** (ID público de conexión: `agent_9601m7c4t540fh6v6nadake0hsrp`), **distinto** del asistente de residentes de 5660. Tiene la voz `T2sZgOl8ol4kf4u6yM2z` y un modelo LLM administrado por ElevenLabs, **no Claude**. Se limita al origen `salcedocristhian.github.io`, a 25 sesiones/día y dos conversaciones simultáneas; esto es un piloto controlado, no autenticación empresarial.
+
+Desde Ajustes → Voz, elige **ElevenAgents · conversación (sin API Key)** (selección predeterminada en una instalación nueva). Toca el orbe para iniciar la voz y autoriza el micrófono; toca nuevamente para finalizar. Mantener pulsado permite escribir, y el agente también recibe texto. El cliente de ElevenAgents se importa bajo demanda desde `https://esm.sh/@elevenlabs/client@1.36.0?bundle`; requiere Internet y puede fallar si la red bloquea ese proveedor.
+
+**JobTread:** el modelo de voz solo tiene acceso a un herramienta del navegador `jobtread_read`. La herramienta ejecuta las consultas de solo lectura del modo directo previamente implementado y devuelve resúmenes limitados, al tiempo que muestra las tarjetas en el propio dispositivo. **El Grant Key de JobTread sigue siendo necesario** en Ajustes de ese mismo navegador; las credenciales no se sincronizan entre iPhone, Safari, Edge ni WebViews. La herramienta devuelve un error claro si falta la conexión, en lugar de inventar proyectos.
+
+**Privacidad:** el agente procesa las transcripciones y los resúmenes de resultados de JobTread que narra. No recibe el Grant Key, pero puede recibir nombres y detalles de proyectos privados; evita datos sensibles y usa un ambiente de pruebas hasta instalar un backend corporativo con inicio de sesión. El agente tiene audio no grabado y retención de conversaciones de 1 día, según la configuración de ElevenLabs. No publiques secretos en GitHub. Si necesitas acceso real multi-dispositivo sin volver a pegar credenciales, todavía hace falta un servidor autenticado: el sitio GitHub Pages no puede guardar llaves privadas de forma segura.
+
+La opción antigua ElevenLabs TTS con API Key y Voice ID permanece disponible para usuarios que ya la tenían configurada.
