@@ -12,7 +12,7 @@
     closer: "Datos consultados en JobTread. Solo lectura.",
     ...(records ? { records } : {})
   });
-  const detail = (name, value) => ({ title: capped(name), value: capped(value) });
+  const detail = (name, value) => ({ title: capped(name), value: safe(value).slice(0, 1200) });
   const collection = (kind, title, items, total, nextPage, extra = {}) => ({
     kind, title, items, total, nextPage: nextPage || null, ...extra
   });
@@ -38,13 +38,13 @@
     detail: safe(j.status) || "Estado no indicado", tag: "PROYECTO" });
   const recordTask = t => ({ id: safe(t.id), title: safe(t.name) || "Tarea sin nombre",
     subtitle: t.endDate ? "Vence: " + safe(t.endDate) : "Sin fecha de vencimiento",
-    detail: typeof t.progress === "number" ? "Avance registrado: " + Math.round(t.progress * 100) + "%" :
-      safe(t.description) || "Sin progreso indicado", tag: "TAREA" });
+    detail: [typeof t.progress === "number" ? "Avance registrado: " + Math.round(t.progress * 100) + "%" : "",
+      safe(t.description).slice(0,600)].filter(Boolean).join(" · ") || "Sin progreso indicado", tag: "TAREA" });
   const recordDocument = d => ({ id: safe(d.id), title: safe(d.fullName) || "Documento sin título",
     subtitle: safe(d.status) || "Estado no indicado",
-    detail: [d.type, d.issueDate].filter(Boolean).join(" · ") || safe(d.description).slice(0,140), tag: "DOCUMENTO" });
+    detail: [d.type, d.issueDate, safe(d.description).slice(0,350)].filter(Boolean).join(" · "), tag: "DOCUMENTO" });
   const recordDailyLog = l => ({ id: safe(l.id), title: safe(l.date) || "Registro de obra",
-    subtitle: safe(l.notes).slice(0,150) || "Sin notas", detail: "", tag: "DAILY LOG" });
+    subtitle: safe(l.notes).slice(0,150) || "Sin notas", detail: safe(l.notes).slice(0,1200), tag: "DAILY LOG" });
   const recordFile = a => ({ id: safe(a.id), title: safe(a.name) || "Archivo",
     subtitle: safe(a.type) || "Archivo de proyecto", detail: safe(a.description).slice(0,140), tag: "ARCHIVO" });
   const fieldsByKind = {
