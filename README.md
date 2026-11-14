@@ -145,3 +145,28 @@ Cada escena incluye animación de entrada, escaneo, iluminación, efectos de pro
 La app sigue siendo lectura de solo Gmail/JobTread: no se añaden claves, permisos ni llamadas a servicios; los textos externos se insertan con `textContent`, sin interpretar HTML de terceros. El Motion Engine es una interpretación visual de registros consultados, **no sustituye los planos, el presupuesto original ni la evidencia verificable**. Se prueba con fixtures inventados únicamente en test, nunca publicados como información del usuario.
 
 Archivos: `public/jarvis-motion.js`, `public/jarvis-motion.css`, `test/motion-v2.mjs`. La inspección visual final debe hacerse en Safari/iPhone para validar contraste, rendimiento y accesibilidad.
+
+## Motion V3: la malla escribe las respuestas
+
+El fondo de malla y el polvo suspendido ahora forman parte de cada respuesta (`public/jarvis-motion.js` y `public/jarvis-motion.css`). Cada tipo de cuadro tiene su propia física:
+
+| Cuadro | Animación |
+|---|---|
+| Titular | La malla y el polvo vuelan y escriben el texto con partículas; al llegar, una onda recorre el terreno. |
+| Cifra | El terreno se levanta detrás del número. |
+| Evidencia, fuente, registro | Un cabezal láser traza el contorno y luego cada línea, como un plotter de planos. |
+| Acción | Marco mecánico que se ensambla, compuertas que se abren y carga por celdas. |
+| Gmail | Los correos caen del orbe como hojas de papel. |
+| Cifras de JobTread | Terreno con una montaña por cifra, proporcional al valor; las etiquetas son el texto exacto de JobTread. |
+| Proyecto con modelo 3D | 5660 Collins: torre real con la silueta de los planos RELATS. Barcelona Gardens: conjunto real con las marcas de NV5 y barrido de radar. |
+| Lista de proyectos | Constelación con un punto por proyecto (las posiciones no significan nada). |
+
+Además: mandala detrás del orbe mientras Jarvis consulta, y el anillo del orbe sigue el volumen real de la voz de ElevenAgents (`getOutputVolume` y `getOutputByteFrequencyData` del SDK, solo lectura).
+
+**Modelos 3D reales, solo lectura.** Jarvis lee `jarvis-model.json` desde `raw.githubusercontent.com/salcedocristhian/5660-collins-app/main/` y `.../Barcelona/main/`, y las marcas desde `Barcelona/main/data/nv5-repair-marks.json`. Si no los encuentra, usa la copia guardada en `public/model-5660-collins.json` y `public/model-barcelona.json`, y lo dice en pantalla. Jarvis nunca escribe en esos repositorios. Los datos se validan antes de dibujarlos y todo el texto externo entra como texto, nunca como HTML.
+
+**Modo calmado.** Con "Movimiento: calmado" o con la reducción de movimiento del sistema, no hay partículas ni mandala; el contenido aparece directo.
+
+**Estudio.** `motion-lab.html` es la galería de todas las animaciones con datos de ejemplo (DEMO).
+
+La variante `servidor/` mantiene su interfaz anterior; Motion V3 vive en la app publicada (`index.html`).
