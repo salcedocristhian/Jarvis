@@ -164,6 +164,28 @@ body.docked .heard{font-size:13px;margin-top:4px}
 @keyframes insight-scan{0%{left:-60%}55%,100%{left:130%}}
 @media(prefers-reduced-motion:reduce){.f-insight .insight-card{transform:none;transition:none}.insight-card::before{animation:none}}
 
+
+/* Orb-first home; live voice status remains accessible to assistive technology. */
+body:not(.docked) .state,body:not(.docked) .heard{
+  position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;margin:0;padding:0
+}
+.gmail-welcome{width:min(92vw,390px);max-height:calc(100dvh - 40px);margin:auto;border:1px solid rgba(147,208,240,.28);
+  border-radius:27px;background:linear-gradient(160deg,#142d48,#071221 72%);color:var(--paper);padding:0;
+  box-shadow:0 28px 85px rgba(0,0,0,.7);overflow-y:auto}
+.gmail-welcome::backdrop{background:rgba(3,8,16,.72);backdrop-filter:blur(12px)}
+.welcome-card{display:flex;flex-direction:column;align-items:center;text-align:center;padding:32px 26px 24px;gap:12px}
+.welcome-mark{display:grid;place-items:center;width:56px;height:56px;border-radius:50%;border:1px solid rgba(147,208,240,.65);
+  color:var(--sky);font-size:26px;box-shadow:0 0 32px rgba(147,208,240,.16);animation:welcome-glow 3.2s ease-in-out infinite}
+.welcome-eyebrow{font-size:10px;letter-spacing:.24em;color:var(--sky);margin:4px 0 0}
+.welcome-card h2{font:700 clamp(21px,5vw,27px)/1.25 var(--display);margin:0}
+.welcome-card>p:not(.welcome-eyebrow):not(.welcome-status){font-size:14px;line-height:1.6;color:#c4d4e2;margin:0 0 7px}
+.welcome-primary,.welcome-skip{min-height:48px;border-radius:999px;cursor:pointer}
+.welcome-primary{width:100%;border:0;background:var(--sky);color:#051524;font-weight:700}
+.welcome-primary:disabled{opacity:.6;cursor:wait}
+.welcome-skip{border:0;background:transparent;color:#b2c8d8;min-height:40px}
+.welcome-status{font-size:12px;line-height:1.5;color:var(--muted);margin:0;min-height:18px}
+@keyframes welcome-glow{50%{box-shadow:0 0 45px rgba(147,208,240,.36)}}
+@media(prefers-reduced-motion:reduce){.welcome-mark{animation:none}}
 </style>
 <script>
 // Marca y preferencias editables. Cambia el nombre aquí y en todo el producto cambia.
@@ -184,7 +206,6 @@ window.UNA_CONFIG = {
   <button class="tiny" id="menuBtn" type="button" aria-label="Menú" aria-haspopup="dialog">
     <svg viewBox="0 0 24 24"><path d="M5 9h14M5 15h9"/></svg>
   </button>
-  <span class="demo" id="demoTag" hidden>DEMO</span>
   <button class="tiny" id="setBtn" type="button" aria-label="Ajustes" aria-haspopup="dialog">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8" stroke-dasharray="2.2 3.1"/></svg>
   </button>
@@ -197,12 +218,7 @@ window.UNA_CONFIG = {
   </button>
   <p class="state" id="state" role="status">Toca para hablar</p>
   <p class="heard" id="heard" aria-live="polite"></p>
-  <div class="handsfree-panel" id="handsfreePanel">
-    <button type="button" class="handsfree-toggle" id="handsfreeToggle" aria-pressed="false" data-active="false">
-      <span class="handsfree-dot" aria-hidden="true"></span><span id="handsfreeLabel">Activar manos libres</span>
-    </button>
-    <span id="handsfreeHint" class="handsfree-hint" aria-live="polite">Escucha continua mientras Jarvis está abierto. Se pausa si sales de la página.</span>
-  </div>
+
   </div>
 
   <section class="reel" id="reel" aria-live="polite" aria-label="Respuesta" hidden>
@@ -219,8 +235,21 @@ window.UNA_CONFIG = {
   <button class="tiny solid" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
 </form>
 
+<dialog class="gmail-welcome" id="gmailWelcome" aria-label="Conectar Gmail a Jarvis">
+  <div class="welcome-card">
+    <div class="welcome-mark" aria-hidden="true">✦</div>
+    <p class="welcome-eyebrow">JARVIS · GMAIL</p>
+    <h2>Conecta tu Gmail</h2>
+    <p>Jarvis podrá consultar tus correos cuando se lo pidas, con acceso de solo lectura. La autorización se realiza directamente con Google.</p>
+    <button class="welcome-primary" id="gmailWelcomeConnect" type="button">Conectar con Google</button>
+    <button class="welcome-skip" id="gmailWelcomeSkip" type="button">Ahora no</button>
+    <p class="welcome-status" id="gmailWelcomeStatus" role="status" aria-live="polite">Tu contraseña nunca se comparte con Jarvis.</p>
+  </div>
+</dialog>
+
 <dialog class="sheet" id="menu" aria-label="Menú">
   <div class="grab"></div>
+  <span class="demo" id="demoTag" hidden>DEMO</span>
   <h2>Proyectos.</h2>
   <div id="projList" class="plist"></div>
   <h2>Hoy.</h2>
@@ -232,6 +261,14 @@ window.UNA_CONFIG = {
 <dialog class="sheet" id="settings" aria-label="Ajustes">
   <div class="grab"></div>
   <h2>Ajustes.</h2>
+  <h3>Micrófono y manos libres</h3>
+  <p class="muted small">Toca el orbe para iniciar o detener la escucha continua. En iPhone se pausa al bloquear la pantalla.</p>
+  <div class="handsfree-panel" id="handsfreePanel">
+    <button type="button" class="handsfree-toggle" id="handsfreeToggle" aria-pressed="false" data-active="false">
+      <span class="handsfree-dot" aria-hidden="true"></span><span id="handsfreeLabel">Activar manos libres</span>
+    </button>
+    <span id="handsfreeHint" class="handsfree-hint" aria-live="polite">Escucha continua mientras Jarvis está abierto. Se pausa si sales de la página.</span>
+  </div>
   <label class="opt">Voz
     <select id="optVoice"><option value="agent">ElevenAgents · conversación (sin API Key)</option><option value="eleven">ElevenLabs TTS · llave personal</option><option value="browser">Del navegador</option><option value="off">Silencio (solo texto)</option></select>
   </label>
@@ -528,18 +565,7 @@ function drawOrb(t) {
   ox.font = `700 ${Math.max(11, R * .2)}px Unbounded, Arial Black, sans-serif`;
   if (ox.letterSpacing !== undefined) ox.letterSpacing = `${R * .03}px`;
   ox.fillText(C.name.toUpperCase(), cx, cy);
-  // satélites: cada proyecto fijo; dorado = algo pendiente
-  const box = oc.getBoundingClientRect(); sats = [];
-  const list = projects.length ? projects : [{ ghost: true }, { ghost: true }, { ghost: true }];
-  list.forEach((p, i) => {
-    const dir = i % 2 ? 1 : -1, a = t * (.16 + i * .03) * dir + i * 2.1, rr = R * (1.12 + (i % 3) * .07);
-    const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr, hot = p.urgent;
-    const size = p.ghost ? 1.6 : hot ? 4.2 : 3;
-    if (hot) { ox.fillStyle = `rgba(201,163,92,${.18 + .12 * Math.sin(t * 2)})`; ox.beginPath(); ox.arc(x, y, size * 3, 0, 7); ox.fill(); }
-    ox.fillStyle = p.ghost ? "rgba(230,240,247,.6)" : hot ? "#C9A35C" : "rgba(230,240,247,.9)";
-    ox.beginPath(); ox.arc(x, y, size, 0, 7); ox.fill();
-    if (!p.ghost) sats.push({ p, x: box.left + x, y: box.top + y });
-  });
+  // Los proyectos se exploran en Menú; la escena principal muestra solo el orbe.
 }
 let last = 0;
 function loop(ms) {
@@ -1072,8 +1098,6 @@ orb.addEventListener("pointerdown", () => { longPressed = false; pressT = setTim
 orb.addEventListener("contextmenu", e => e.preventDefault());
 orb.addEventListener("click", e => {
   if (longPressed) return;
-  const hit = sats.find(s => Math.hypot(s.x - e.clientX, s.y - e.clientY) < 24);
-  if (hit) return askAbout(hit.p);
   if (useAgentVoice()) {
     if (agentClient?.connected) {
       if (handsfreePreferred) {
@@ -1149,21 +1173,40 @@ bind("#optVoice", "voice", () => {
 });
 $("#testBtn").addEventListener("click", testConnections);
 const gmailIdInput = $("#gmailClientId"), gmailStatusEl = $("#gmailStatus");
-gmailIdInput.value = store.get("gmail.clientId", "");
-gmailIdInput.addEventListener("change", () => store.set("gmail.clientId", gmailIdInput.value.trim()));
-$("#gmailConnect").addEventListener("click", async () => {
+const welcome = $("#gmailWelcome"), welcomeStatus = $("#gmailWelcomeStatus");
+const welcomeConnect = $("#gmailWelcomeConnect"), settingsConnect = $("#gmailConnect");
+const DEFAULT_GMAIL_CLIENT_ID = "177629728774-f6bbak14vnrn2ud6573dinaj1gt2suc6.apps.googleusercontent.com";
+gmailIdInput.value = store.get("gmail.clientId", DEFAULT_GMAIL_CLIENT_ID);
+let gmailConnecting = false;
+function showGmailWelcome() {
+  if (!gmailClient?.connected && !welcome.open) welcome.showModal();
+}
+async function connectGmail() {
+  if (gmailConnecting) return;
+  gmailConnecting = true;
+  welcomeConnect.disabled = settingsConnect.disabled = true;
   const id = gmailIdInput.value.trim();
-  store.set("gmail.clientId", id); // Public client identifier, NOT a secret.
-  gmailStatusEl.textContent = "Solicitando autorización directamente a Google…";
+  store.set("gmail.clientId", id); // Only the public OAuth client ID persists.
+  welcomeStatus.textContent = gmailStatusEl.textContent = "Abriendo la autorización segura de Google…";
   try {
     await gmailClient.connect(id);
-    gmailStatusEl.textContent = "Gmail autorizado solo para lectura en esta sesión. Puedes preguntar por tus correos.";
+    const success = "Gmail conectado · acceso de solo lectura activo en esta sesión.";
+    welcomeStatus.textContent = gmailStatusEl.textContent = success;
+    if (welcome.open) welcome.close();
     renderConns();
   } catch (e) {
-    gmailStatusEl.textContent = "Gmail sin conectar: " + String(e.message || e).slice(0, 200);
+    const msg = "No se pudo conectar Gmail: " + String(e.message || e).slice(0, 180);
+    welcomeStatus.textContent = gmailStatusEl.textContent = msg;
     renderConns();
+  } finally {
+    gmailConnecting = false;
+    welcomeConnect.disabled = settingsConnect.disabled = false;
   }
-});
+}
+welcomeConnect.addEventListener("click", connectGmail);
+$("#gmailWelcomeSkip").addEventListener("click", () => welcome.close());
+gmailIdInput.addEventListener("change", () => store.set("gmail.clientId", gmailIdInput.value.trim()));
+settingsConnect.addEventListener("click", connectGmail);
 $("#gmailDisconnect").addEventListener("click", () => {
   gmailClient.disconnect();
   gmailStatusEl.textContent = "Gmail desconectado de esta sesión.";
@@ -1288,6 +1331,9 @@ async function boot() {
   status = { agent: "ready", gmail: gmailClient?.connected ? "connected" : "not_connected", claude: keys.claude ? "connected" : "not_connected", jobtread: keys.jobtread ? "connected" : "not_connected", elevenlabs: keys.eleven && keys.voiceId ? "connected" : "not_connected", outlook: "not_connected" };
   $("#demoTag").hidden = !demo;
   renderConns();
+  // Show Google invitation first; voice code preloads without requesting microphone access.
+  showGmailWelcome();
+  agentClient?.preload?.().catch(() => {});
   try { projects = demo ? DEMO_PROJECTS : keys.jobtread ? await loadDirectProjects() : []; }
   catch (e) { projects = []; stateEl.textContent = "JobTread: " + e.message; }
   if (!demo && keys.jobtread && !keys.claude && projects.length) stateEl.textContent = "JobTread listo · pregunta por tus proyectos";
