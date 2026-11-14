@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Unbounded:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./public/jarvis-explorer.css">
 <style>
 :root{
   --ink:#04070C; --deep:#0A1A30; --line:#1F3D5E; --mesh:#3F7DB5;
@@ -207,6 +208,7 @@ window.UNA_CONFIG = {
   <section class="reel" id="reel" aria-live="polite" aria-label="Respuesta" hidden>
     <div class="frames" id="frames"></div>
     <div class="ticks" id="ticks" aria-hidden="true"></div>
+    <div class="data-explorer" id="dataExplorer" hidden></div>
     <p class="closer" id="closer"></p>
   </section>
 </main>
@@ -269,6 +271,7 @@ window.UNA_CONFIG = {
 <script src="./public/eleven-agent-client.js"></script>
 <script src="https://accounts.google.com/gsi/client" id="google-identity-services" async defer></script>
 <script src="./public/gmail-readonly.js"></script>
+<script src="./public/jarvis-explorer.js"></script>
 <script>
 /* Una — cliente. Sin dependencias. */
 (() => {
@@ -734,6 +737,40 @@ function go(i) {
 }
 function showReel(out) {
   clearTimeout(reelTimer);
+  const hasRecords = Boolean(out?.records && Array.isArray(out.records.items));
+  reel.classList.toggle("with-explorer", hasRecords);
+  if (hasRecords) {
+    window.JarvisExplorer?.render(out.records, {
+      onMore: async state => {
+        if (state.kind === "gmail") {
+          const more = await gmailClient.messages(state.query, state.limit || 20, state.nextPage);
+          return { items: gmailToRecords(more.messages), total: more.countEstimate,
+            nextPage: more.nextPageToken };
+        }
+        return globalThis.JarvisDirect.moreRecords(state, { query: jt, orgId: await ensureOrg() });
+      },
+      onOpen: async (state, item) => {
+        if (state.kind === "gmail") {
+          const message = await gmailClient.readMessage(item.id);
+          return { tag: "GMAIL · MENSAJE COMPLETO", title: message.subject,
+            subtitle: [message.from, message.date].filter(Boolean).join("\n"),
+            body: message.body + (message.hasAttachments ? "\n\nEste mensaje tiene adjuntos. Jarvis todavía no abre archivos adjuntos." : "") };
+        }
+        if (state.kind === "jobs") {
+          const detail = await globalThis.JarvisDirect.answer("Revisa el proyecto " + item.title, {
+            query: jt, orgId: await ensureOrg(), preferredJobId: item.id
+          });
+          if (detail.project) lastDirectJobId = detail.project;
+          showReel(detail);
+          narrateVerifiedResult(detail, "JobTread");
+          return null;
+        }
+        return { tag: item.tag || "JOBTREAD", title: item.title || "Registro",
+          subtitle: item.subtitle || "", body: item.detail || item.value || "Sin información adicional." };
+      }
+    });
+  } else window.JarvisExplorer?.reset();
+  reel.dataset.voice = phase;
   reelFrames = (out.frames && out.frames.length ? out.frames : [{ type: "headline", text: out.speech }]).slice(0, 6);
   framesEl.innerHTML = reelFrames.map(frameHTML).join("");
   ticksEl.innerHTML = reelFrames.length > 1 ? reelFrames.map(() => "<i></i>").join("") : "";
@@ -892,47 +929,64 @@ async function agentJobTreadRead({ question } = {}) {
 
 /* Gmail only returns sender, subject and short snippet after explicit Google OAuth.
    The access token NEVER leaves this browser for ElevenLabs. */
+function gmailToRecords(items) {
+  return (items || []).map(m => ({ id: m.id,
+    title: m.subject || "Sin asunto", subtitle: m.from || "Remitente no indicado",
+    detail: [m.unread ? "● NO LEÍDO" : "", m.date, m.snippet].filter(Boolean).join(" · "),
+    tag: m.unread ? "GMAIL · NO LEÍDO" : "GMAIL" }));
+}
+function gmailSearchForQuestion(question) {
+  const q = String(question || "").trim();
+  if (/no le[ií]d|sin leer|unread/i.test(q)) return "in:inbox is:unread";
+  if (/enviad|sent/i.test(q)) return "in:sent";
+  if (/todos.*correos|toda.*bandeja|all mail/i.test(q)) return "in:anywhere";
+  const email = q.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/);
+  if (email) return "from:" + email[0];
+  const sender = q.match(/(?:email|correo|mensaje|emails|correos)\s+de\s+([\p{L}\d.-]{3,40})/iu)
+    || q.match(/\b(?:from|remitente)\s+([\p{L}\d.-]{3,40})/iu);
+  if (sender && !/^(gmail|jobtread|hoy|ayer|mis)$/i.test(sender[1])) return "from:" + sender[1];
+  const subject = q.match(/(?:sobre|asunto|subject)\s+([\p{L}\d ._-]{3,70})/iu);
+  if (subject) return "subject:" + subject[1].trim().replace(/[^\p{L}\d ._-]/gu, "");
+  return "in:inbox";
+}
 async function agentGmailRead({ question } = {}) {
   noteRealToolCall();
   const q = String(question || agentLastQuestion || "¿Cuáles son mis últimos correos?").slice(0, 500);
   if (!gmailClient?.connected) {
-    const out = {
-      speech: "Gmail todavía no está conectado en este navegador. Abre Ajustes y pulsa Conectar Gmail con Google para autorizar el acceso de solo lectura.",
-      frames: [{ type: "headline", text: "Gmail necesita autorización de Google." },
-        { type: "action", text: "Ajustes · Gmail · Conectar Gmail con Google" }],
-      closer: "Sin permiso de Google no puedo leer tus correos."
-    };
+    const out = { speech: "Gmail no está autorizado en esta sesión. Abre Ajustes y pulsa Conectar Gmail con Google.",
+      frames: [{ type: "headline", text: "Gmail requiere autorización" },
+        { type: "action", text: "Ajustes · Gmail · Conectar con Google" }],
+      closer: "No se accedió a ningún mensaje." };
     showReel(out); narrateVerifiedResult(out, "Gmail");
     return { ok: false, speech: out.speech };
   }
   try {
-    setPhase("thinking", "Consultando Gmail");
-    let filter = "in:inbox";
-    if (/no le[ií]d|sin leer|unread/i.test(q)) filter = "in:inbox is:unread";
-    else if (/enviad|sent/i.test(q)) filter = "in:sent";
-    const from = q.match(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/);
-    if (from) filter += " from:" + from[0];
-    const data = await gmailClient.messages(filter, 5);
+    setPhase("thinking", "Buscando mensajes reales en Gmail");
+    const filter = gmailSearchForQuestion(q);
+    const batch = /(?:todos|todas|lista completa|all)/i.test(q) ? 30 : 20;
+    const data = await gmailClient.messages(filter, batch);
     const emails = data.messages;
     const subjects = emails.slice(0, 3).map(m => m.subject || "Sin asunto");
-    const speech = emails.length
-      ? "Encontré " + emails.length + " correos en Gmail. Los primeros asuntos son: " + subjects.join("; ") + "."
-      : "No encontré correos que coincidan con la búsqueda solicitada.";
-    const out = { speech,
-      frames: [{ type: "headline", text: "Gmail · " + (filter.includes("unread") ? "No leídos" : "Correos recientes") },
-        ...emails.slice(0, 5).map(m => ({
-          type: "insight", tag: "GMAIL · SOLO LECTURA", title: m.subject || "Sin asunto",
-          value: m.from || "Remitente no indicado", note: m.snippet || m.date || "Sin extracto"
-        }))],
-      closer: "Datos de Gmail autorizados en este navegador. Sin modificar correos." };
+    const more = Boolean(data.nextPageToken);
+    const speech = emails.length ? "He cargado " + emails.length + " correos" +
+      (more ? " y hay más páginas disponibles." : ".") +
+      " Puedes explorarlos y leer cada mensaje completo en pantalla. " +
+      (subjects.length ? "Algunos asuntos son " + subjects.join("; ") + "." : "")
+      : "No encontré correos que coincidan con esa búsqueda.";
+    const records = { kind: "gmail", title: "Gmail · " + (filter.includes("unread") ? "No leídos" : "Resultados"),
+      items: gmailToRecords(emails), total: data.countEstimate, approximate: true,
+      nextPage: data.nextPageToken, query: filter, limit: batch };
+    const out = { speech, frames: [
+      { type: "headline", text: filter.includes("unread") ? "Gmail · Sin leer" : "Gmail · Búsqueda real" },
+      { type: "number", value: emails.length, format: "count", label: "mensajes cargados en esta página" }
+    ], records, closer: "Solo lectura · Sin cambios en Gmail." };
     showReel(out);
-    timeline.unshift({ q, a: out.speech }); renderHistory();
+    timeline.unshift({ q, a: speech }); renderHistory();
     narrateVerifiedResult(out, "Gmail");
-    // Only derived metadata, NEVER the access token.
-    return { ok: true, speech: out.speech, count: emails.length, sources: ["Gmail"] };
+    return { ok: true, speech, shown: emails.length, hasMore: more, sources: ["Gmail"] };
   } catch (e) {
-    const message = "No pude consultar Gmail: " + String(e.message || e).slice(0, 130);
-    const out = { speech: message, frames: [{ type: "headline", text: "Consulta de Gmail no disponible." },
+    const message = "No pude consultar Gmail: " + String(e.message || e).slice(0, 140);
+    const out = { speech: message, frames: [{ type: "headline", text: "Gmail no disponible" },
       { type: "evidence", title: message, source: "Gmail" }] };
     showReel(out); narrateVerifiedResult(out, "Gmail");
     return { ok: false, speech: out.speech };
@@ -968,6 +1022,7 @@ async function startAgentVoice(optionalQuestion = "") {
         const mode = String(m?.mode || m || "");
         if (mode === "speaking") setPhase("speaking", "Jarvis respondiendo · micrófono activo");
         else if (mode === "listening") setPhase("listening", "Escuchando continuamente · micrófono activo");
+        reel.dataset.voice = mode;
       },
       onMessage: m => {
         if (!m?.text) return;
