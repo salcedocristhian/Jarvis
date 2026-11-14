@@ -36,6 +36,7 @@
   }
   function matchJob(question, jobs, preferredId) {
     const q = norm(question);
+    const requiredNum = q.match(/\b\d{3,}\b/)?.[0];
     const searched = projectTerms(question);
     const matches = jobs.map(j => {
       const name = norm(j.name), number = norm(j.number);
@@ -45,6 +46,7 @@
       if (number && number.length >= 3 && q.includes(number)) score = Math.max(score, 95);
       for (const word of searched) if (name.includes(word) || number.includes(word)) score += (word.length >= 4 ? 12 : 8);
       for (const t of terms) if (!["project","proyecto","condominium","construction","building","avenue","restoration","painting","the"].includes(t) && q.includes(t)) score = Math.max(score, 15 + t.length);
+      if (requiredNum && !name.includes(requiredNum) && !number.includes(requiredNum)) score = 0;
       return { j, score };
     }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
     if (matches.length && (matches.length === 1 || matches[0].score > matches[1].score)) return matches[0].j;
