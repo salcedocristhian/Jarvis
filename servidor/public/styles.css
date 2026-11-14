@@ -111,3 +111,17 @@ body.docked .heard{font-size:13px;margin-top:4px}
   body.docked .reel{margin-top:0;max-width:560px;height:min(70vh,560px);flex:none}
   .reel.absorb{transform:translateX(-30vw) scale(.08)}
 }
+
+
+/* Real-project cinematic cards. Keep the orb as the main navigation surface. */
+.f-insight .insight-card{position:relative;overflow:hidden;border:1px solid rgba(127,191,237,.33);border-radius:23px;padding:23px 21px 21px;background:radial-gradient(ellipse at 85% 0%,rgba(34,123,183,.23),transparent 58%),linear-gradient(155deg,rgba(13,37,64,.96),rgba(3,10,21,.96));box-shadow:0 28px 80px -35px rgba(29,156,237,.34),0 15px 40px rgba(0,0,0,.36);backdrop-filter:blur(16px);transform:perspective(640px) rotateX(7deg) translateY(25px) scale(.94);opacity:0;transition:transform .76s cubic-bezier(.16,1,.3,1),opacity .65s ease;}
+.f-insight.on .insight-card{transform:perspective(640px) rotateX(0) translateY(0) scale(1);opacity:1}
+.insight-card::before{content:"";position:absolute;top:0;left:-60%;height:1px;width:60%;background:linear-gradient(90deg,transparent,rgba(126,210,255,.8),transparent);animation:insight-scan 4s linear infinite}
+.insight-card .insight-tag{font-size:10px;letter-spacing:.16em;color:var(--brass);font-weight:700}
+.insight-card .insight-title{margin:17px 0 9px;font-weight:600;font-size:16px;color:var(--paper)}
+.insight-card .insight-value{font-family:var(--display);display:block;line-height:1.04;letter-spacing:-.035em;font-size:clamp(27px,9vw,43px);color:var(--sky);overflow-wrap:anywhere}
+.insight-card .insight-note{font-size:14px;line-height:1.5;color:var(--muted);margin:15px 0 0}
+.insight-card .source-link{display:inline-flex;position:relative;z-index:3;padding:12px 14px;margin-top:17px;border:1px solid rgba(139,198,244,.4);border-radius:999px;color:var(--sky);text-decoration:none;font-size:12px;min-height:42px;align-items:center}
+.insight-card.future-card{border-color:rgba(201,163,92,.42);background:radial-gradient(ellipse at 90% 0%,rgba(201,163,92,.16),transparent 64%),linear-gradient(155deg,rgba(19,28,43,.98),rgba(3,10,21,.96))}
+@keyframes insight-scan{0%{left:-60%}55%,100%{left:130%}}
+@media(prefers-reduced-motion:reduce){.f-insight .insight-card{transform:none;transition:none}.insight-card::before{animation:none}}
