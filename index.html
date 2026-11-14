@@ -64,6 +64,11 @@ main{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;
 @media(prefers-reduced-motion:reduce){.handsfree-toggle[data-active="true"] .handsfree-dot{animation:none}}
 body.docked .handsfree-panel{margin-top:6px}
 body.docked .handsfree-hint{display:none}
+.gmail-welcome .welcome-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px}
+.gmail-welcome .welcome-actions .btn{flex:1;min-width:145px}
+.gmail-welcome .gmail-intro{font-size:15px;line-height:1.5;color:var(--paper)}
+.gmail-welcome #gmailWelcomeStatus{min-height:2.6em;line-height:1.4}
+.gmail-welcome #gmailWelcomeConnect:disabled{opacity:.55;cursor:wait}
 
 /* docked: orb steps back, the answer takes the floor */
 body.docked main{justify-content:flex-start}
@@ -184,7 +189,7 @@ window.UNA_CONFIG = {
   <button class="tiny" id="menuBtn" type="button" aria-label="Menú" aria-haspopup="dialog">
     <svg viewBox="0 0 24 24"><path d="M5 9h14M5 15h9"/></svg>
   </button>
-  <span class="demo" id="demoTag" hidden>DEMO</span>
+  <span class="demo sr" id="demoTag" hidden>DEMO</span>
   <button class="tiny" id="setBtn" type="button" aria-label="Ajustes" aria-haspopup="dialog">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8" stroke-dasharray="2.2 3.1"/></svg>
   </button>
@@ -195,9 +200,9 @@ window.UNA_CONFIG = {
   <button class="orb" id="orb" type="button" aria-label="Hablar con Una">
     <canvas id="orbCanvas" aria-hidden="true"></canvas>
   </button>
-  <p class="state" id="state" role="status">Toca para hablar</p>
-  <p class="heard" id="heard" aria-live="polite"></p>
-  <div class="handsfree-panel" id="handsfreePanel">
+  <p class="state sr" id="state" role="status">Toca para hablar</p>
+  <p class="heard sr" id="heard" aria-live="polite"></p>
+  <div class="handsfree-panel" id="handsfreePanel" hidden>
     <button type="button" class="handsfree-toggle" id="handsfreeToggle" aria-pressed="false" data-active="false">
       <span class="handsfree-dot" aria-hidden="true"></span><span id="handsfreeLabel">Activar manos libres</span>
     </button>
@@ -218,6 +223,19 @@ window.UNA_CONFIG = {
   <input id="typeIn" autocomplete="off" placeholder="Escríbele a Una">
   <button class="tiny solid" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
 </form>
+
+<dialog class="sheet gmail-welcome" id="gmailWelcome" aria-labelledby="gmailWelcomeTitle">
+  <div class="grab"></div>
+  <p class="muted small">INICIO · GMAIL</p>
+  <h2 id="gmailWelcomeTitle">Conecta Gmail a Jarvis.</h2>
+  <p class="gmail-intro">Conecta tu cuenta con Google y podrás consultar tus correos con la voz de Jarvis, sin entrar a Ajustes.</p>
+  <div class="welcome-actions">
+    <button class="btn primary" type="button" id="gmailWelcomeConnect">Conectar Gmail</button>
+    <button class="btn ghost" type="button" id="gmailWelcomeSkip">Ahora no</button>
+  </div>
+  <p class="muted small" id="gmailWelcomeStatus" role="status" aria-live="polite">Solo lectura. Google controla la autorización.</p>
+  <p class="muted small">La conexión dura mientras la sesión y el token estén vigentes. Al abrir Jarvis de nuevo, podrás renovar el acceso con un toque; Google puede pedirte iniciar sesión o elegir cuenta.</p>
+</dialog>
 
 <dialog class="sheet" id="menu" aria-label="Menú">
   <div class="grab"></div>
@@ -264,7 +282,7 @@ window.UNA_CONFIG = {
   <p class="muted small">En <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noopener noreferrer">Google Cloud · Clients</a>, registra el origen <b>https://salcedocristhian.github.io</b> para un cliente OAuth de tipo Web. Configura la pantalla de consentimiento y tu usuario de prueba si corresponde.</p>
   <div class="btnrow"><button class="btn primary" type="button" id="testBtn">Probar conexiones</button><button class="btn ghost" type="button" id="forget">Borrar llaves</button></div>
   <ul class="conns" id="testOut"></ul>
-  <p class="muted small">Mantén presionado el orbe para escribir. Desliza hacia abajo para despejar la pantalla.</p>
+  <p class="muted small">Toca el orbe una vez para iniciar o detener la conversación continua. Mantén presionado para escribir. Desliza hacia abajo para despejar la pantalla.</p>
 </dialog>
 
 <script src="./public/jobtread-direct.js"></script>
@@ -1149,26 +1167,55 @@ bind("#optVoice", "voice", () => {
 });
 $("#testBtn").addEventListener("click", testConnections);
 const gmailIdInput = $("#gmailClientId"), gmailStatusEl = $("#gmailStatus");
-gmailIdInput.value = store.get("gmail.clientId", "");
+const gmailWelcome = $("#gmailWelcome"), gmailWelcomeStatus = $("#gmailWelcomeStatus");
+const gmailWelcomeConnect = $("#gmailWelcomeConnect"), gmailSettingsConnect = $("#gmailConnect");
+// Public OAuth Client ID for this GitHub Pages origin. No client secret or access token is bundled.
+const DEFAULT_GMAIL_CLIENT_ID = "177629728774-f6bbak14vnrn2ud6573dinaj1gt2suc6.apps.googleusercontent.com";
+gmailIdInput.value = store.get("gmail.clientId", DEFAULT_GMAIL_CLIENT_ID);
 gmailIdInput.addEventListener("change", () => store.set("gmail.clientId", gmailIdInput.value.trim()));
-$("#gmailConnect").addEventListener("click", async () => {
+async function connectGmailFromButton() {
   const id = gmailIdInput.value.trim();
-  store.set("gmail.clientId", id); // Public client identifier, NOT a secret.
+  if (!gmailClient.isClientId(id)) {
+    const message = "No hay un Client ID válido. Abre Ajustes → Gmail.";
+    gmailStatusEl.textContent = message;
+    gmailWelcomeStatus.textContent = message;
+    return;
+  }
+  // Google OAuth's token flow needs the user's click; never launch its popup on page load.
+  store.set("gmail.clientId", id); // Public identifier only, not a token.
+  gmailSettingsConnect.disabled = true;
+  gmailWelcomeConnect.disabled = true;
   gmailStatusEl.textContent = "Solicitando autorización directamente a Google…";
+  gmailWelcomeStatus.textContent = "Conectando con Google…";
   try {
     await gmailClient.connect(id);
     gmailStatusEl.textContent = "Gmail autorizado solo para lectura en esta sesión. Puedes preguntar por tus correos.";
-    renderConns();
+    gmailWelcomeStatus.textContent = "Gmail conectado.";
+    if (gmailWelcome.open) gmailWelcome.close();
   } catch (e) {
-    gmailStatusEl.textContent = "Gmail sin conectar: " + String(e.message || e).slice(0, 200);
+    const message = "Gmail sin conectar: " + String(e.message || e).slice(0, 200);
+    gmailStatusEl.textContent = message;
+    gmailWelcomeStatus.textContent = message;
+  } finally {
+    gmailSettingsConnect.disabled = false;
+    gmailWelcomeConnect.disabled = false;
     renderConns();
   }
-});
+}
+gmailSettingsConnect.addEventListener("click", connectGmailFromButton);
+gmailWelcomeConnect.addEventListener("click", connectGmailFromButton);
+$("#gmailWelcomeSkip").addEventListener("click", () => gmailWelcome.close());
 $("#gmailDisconnect").addEventListener("click", () => {
   gmailClient.disconnect();
   gmailStatusEl.textContent = "Gmail desconectado de esta sesión.";
+  gmailWelcomeStatus.textContent = "Gmail desconectado. Conecta cuando quieras.";
   renderConns();
 });
+function showGmailWelcomeOnLaunch() {
+  if (!gmailClient?.connected && !gmailWelcome.open && !/\bnoGmailPrompt=1\b/.test(location.search)) {
+    gmailWelcome.showModal();
+  }
+}
 $("#forget").addEventListener("click", () => { if (!confirm("¿Borrar todas las llaves de este teléfono?")) return; ["k.claude","k.jobtread","k.eleven","k.voiceId"].forEach(k => { store.set(k, ""); }); location.reload(); });
 
 /* --- DEMO REAL: READ-ONLY GITHUB DATA. No secret keys or invented financial data. --- */
@@ -1294,7 +1341,9 @@ async function boot() {
   renderProjects();
   if (demo && !keys.jobtread) stateEl.textContent = "Voz ElevenAgents disponible · JobTread requiere Grant Key en este navegador";
 }
-setPhase("idle"); renderHandsfree(); renderHistory(); boot();
+setPhase("idle"); renderHandsfree(); renderHistory(); // Preload the ElevenAgents JavaScript in the background: no microphone or conversation starts here.
+agentClient?.preload?.().catch(() => {});
+showGmailWelcomeOnLaunch(); boot();
 })();
 
 </script>

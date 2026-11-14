@@ -55,7 +55,7 @@
           pending?.reject(new Error(response?.message || response?.type || "La ventana de Google se cerró."));
         }
       });
-      try { auth.requestAccessToken({ prompt: "consent" }); }
+      try { auth.requestAccessToken({ prompt: "" }); }
       catch (e) { currentGrant = null; reject(e); }
     });
   }
