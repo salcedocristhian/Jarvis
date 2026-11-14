@@ -13,6 +13,9 @@
     if (!sdkPromise) sdkPromise = import(SDK_URL).catch(e => { sdkPromise = null; throw e; });
     return sdkPromise;
   }
+  // Download only the public ElevenAgents SDK in the background. Do not request
+  // microphone permission or start a call until the user touches the orb.
+  function preload() { return sdk().then(() => true); }
   function getMessageText(m) {
     if (!m || typeof m !== "object") return "";
     const value = m.message || m.text || m.transcript || "";
@@ -61,7 +64,7 @@
     return true;
   }
   window.JarvisElevenAgent = Object.freeze({
-    start, stop, send, get connected() { return !!session; },
+    start, stop, send, preload, get connected() { return !!session; },
     get connecting() { return connecting; }, id: AGENT_ID
   });
 })();
