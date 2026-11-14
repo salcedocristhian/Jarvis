@@ -78,21 +78,68 @@
   function safeText(value, max = 200) {
     return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
   }
-  async function messages(search = "in:inbox", limit = 5) {
-    const q = safeText(search, 160) || "in:inbox";
-    const take = Math.min(6, Math.max(1, Number(limit) || 5));
-    const page = await request("messages?maxResults=" + take + "&q=" + encodeURIComponent(q));
+  async function messages(search = "in:inbox", limit = 20, pageToken = "") {
+    const q = safeText(search, 180) || "in:inbox";
+    const take = Math.min(50, Math.max(1, Number(limit) || 20));
+    const suffix = pageToken ? "&pageToken=" + encodeURIComponent(String(pageToken).slice(0, 400)) : "";
+    const page = await request("messages?maxResults=" + take + "&q=" + encodeURIComponent(q) + suffix);
     const messageIds = Array.isArray(page.messages) ? page.messages.slice(0, take) : [];
-    const details = await Promise.all(messageIds.map(m =>
-      request("messages/" + encodeURIComponent(m.id) + "?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date")
-    ));
+    // Fetch metadata in small groups to avoid overwhelming an iPhone connection.
+    const details = [];
+    for (let offset = 0; offset < messageIds.length; offset += 8) {
+      const part = await Promise.all(messageIds.slice(offset, offset + 8).map(m =>
+        request("messages/" + encodeURIComponent(m.id) + "?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date")
+      ));
+      details.push(...part);
+    }
     return { messages: details.map(d => ({
       id: String(d.id || ""), threadId: String(d.threadId || ""),
-      from: safeText(header(d, "From"), 110), subject: safeText(header(d, "Subject"), 130),
-      snippet: safeText(d.snippet, 150), date: safeText(header(d, "Date"), 65),
+      from: safeText(header(d, "From"), 130), subject: safeText(header(d, "Subject"), 180),
+      snippet: safeText(d.snippet, 230), date: safeText(header(d, "Date"), 75),
       unread: Array.isArray(d.labelIds) && d.labelIds.includes("UNREAD")
-    })), query: q, // resultSizeEstimate is approximate; never call it exact.
+    })), query: q,
+      nextPageToken: typeof page.nextPageToken === "string" ? page.nextPageToken : null,
+      // Google's resultSizeEstimate is an ESTIMATE, not an exact count.
       countEstimate: Number.isInteger(page.resultSizeEstimate) ? page.resultSizeEstimate : null };
+  }
+  function decodeBody(part) {
+    const data = part?.body?.data;
+    if (!data || typeof atob !== "function") return "";
+    const raw = atob(data.replace(/-/g, "+").replace(/_/g, "/"));
+    try { return new TextDecoder().decode(Uint8Array.from(raw, c => c.charCodeAt(0))); }
+    catch { return raw; }
+  }
+  function collectBody(payload) {
+    const stack = [payload], plain = [], html = [];
+    while (stack.length) {
+      const part = stack.pop();
+      if (!part) continue;
+      if (Array.isArray(part.parts)) for (const child of part.parts) stack.push(child);
+      const body = decodeBody(part);
+      if (!body) continue;
+      if (part.mimeType === "text/plain") plain.push(body);
+      else if (part.mimeType === "text/html") html.push(body);
+    }
+    if (plain.length) return plain.join("\n").trim();
+    if (!html.length) return "";
+    const markup = html.join("\n");
+    if (typeof DOMParser !== "undefined") {
+      const doc = new DOMParser().parseFromString(markup, "text/html");
+      doc.querySelectorAll("script,style,noscript,iframe").forEach(n => n.remove());
+      return (doc.body?.textContent || "").replace(/[ \t]+/g, " ").trim();
+    }
+    return markup.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  }
+  async function readMessage(id) {
+    const msgId = String(id || "");
+    if (!/^[a-zA-Z0-9_-]{3,120}$/.test(msgId)) throw new Error("Identificador de correo no válido.");
+    const data = await request("messages/" + encodeURIComponent(msgId) + "?format=full");
+    const body = collectBody(data.payload).slice(0, 18000);
+    return { id: msgId, from: safeText(header(data,"From"), 160),
+      subject: safeText(header(data,"Subject"), 200),
+      date: safeText(header(data,"Date"), 95),
+      body: body || safeText(data.snippet, 1500) || "Este correo no tiene cuerpo de texto visible.",
+      hasAttachments: JSON.stringify(data.payload?.parts || []).includes('"filename":') };
   }
   function disconnect() {
     const token = accessToken;
@@ -100,7 +147,7 @@
     if (token && scope.google?.accounts?.oauth2?.revoke) scope.google.accounts.oauth2.revoke(token, () => {});
   }
   scope.JarvisGmail = Object.freeze({
-    connect, messages, disconnect, isClientId,
+    connect, messages, readMessage, disconnect, isClientId,
     get connected() { return ready(); },
     get clientId() { return activeClient; }
   });
