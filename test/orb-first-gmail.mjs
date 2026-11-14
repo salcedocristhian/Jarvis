@@ -1,0 +1,30 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+const agent = await readFile(new URL("../public/eleven-agent-client.js", import.meta.url), "utf8");
+const gmail = await readFile(new URL("../public/gmail-readonly.js", import.meta.url), "utf8");
+const header = html.slice(html.indexOf('<header class="chrome">'), html.indexOf("</header>"));
+const home = html.slice(html.indexOf("<main>"), html.indexOf("</main>"));
+const settings = html.slice(html.indexOf('<dialog class="sheet" id="settings"'), html.indexOf("</dialog>", html.indexOf('<dialog class="sheet" id="settings"')));
+const welcome = html.slice(html.indexOf('<dialog class="gmail-welcome"'), html.indexOf("</dialog>", html.indexOf('<dialog class="gmail-welcome"')));
+
+assert.equal((header.match(/<button /g) || []).length, 2, "Home header should only show menu/settings");
+assert.ok(header.includes('id="menuBtn"') && header.includes('id="setBtn"'));
+assert.ok(home.includes('id="orb"'), "The orb remains the home interaction");
+assert.ok(!home.includes('id="handsfreeToggle"'), "No hands-free button under orb");
+assert.ok(!header.includes("demoTag"), "No demo badge in home chrome");
+assert.ok(settings.includes('id="handsfreeToggle"'), "Hands-free control remains in settings");
+assert.ok(welcome.includes('id="gmailWelcomeConnect"') && welcome.includes('id="gmailWelcomeSkip"'), "Gmail startup has primary/skip actions");
+assert.ok(html.includes('welcomeConnect.addEventListener("click", connectGmail);'), "Gmail can connect from welcome");
+assert.ok(html.includes('settingsConnect.addEventListener("click", connectGmail);'), "Settings Gmail remains usable");
+assert.ok(html.includes("showGmailWelcome();"), "Gmail welcome opens at app start");
+assert.ok(html.includes('agentClient?.preload?.().catch(() => {});'), "Voice SDK preloads quietly");
+assert.ok(agent.includes("preload: sdk"), "Preload is exported");
+assert.ok(!agent.includes("sdk().then(start)"), "Mic is never auto-started");
+assert.ok(gmail.includes('requestAccessToken({ prompt: "" })'), "Do not force repeat Google consent");
+assert.ok(!gmail.includes("localStorage.setItem"), "Gmail access tokens are not persisted");
+assert.ok(html.includes("DEFAULT_GMAIL_CLIENT_ID"), "Public client is available without re-entering it");
+const inline = html.slice(html.indexOf("/* Una — cliente. Sin dependencias. */"), html.lastIndexOf("</script>"));
+new Function(inline);
+console.log("✓ Orb-first welcome, Gmail auth and background voice preload have valid scripts and expected controls");
