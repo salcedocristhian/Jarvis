@@ -63,8 +63,16 @@
     session.sendUserMessage(String(text).slice(0, 1500));
     return true;
   }
+  // Real output loudness of the agent's voice (0..1) and its frequency bands, for the orb ring.
+  // Read-only calls on the SDK session; they never touch the microphone or the network.
+  function level() {
+    try { const v = session?.getOutputVolume?.(); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0; } catch { return 0; }
+  }
+  function bands() {
+    try { const d = session?.getOutputByteFrequencyData?.(); return d && d.length ? d : null; } catch { return null; }
+  }
   window.JarvisElevenAgent = Object.freeze({
-    start, stop, send, preload, get connected() { return !!session; },
+    start, stop, send, preload, level, bands, get connected() { return !!session; },
     get connecting() { return connecting; }, id: AGENT_ID
   });
 })();
