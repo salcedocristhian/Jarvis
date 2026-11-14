@@ -71,6 +71,7 @@
       const needle = input.value.trim().toLocaleLowerCase();
       const filtered = current.items.filter(x =>
         [x.title, x.subtitle, x.detail, x.tag].some(v => safe(v).toLocaleLowerCase().includes(needle)));
+      const oldScroll = list.scrollTop || 0;
       list.textContent = "";
       const fragment = document.createDocumentFragment();
       // Each loaded page is limited to 50 records. A user can load more on demand.
@@ -92,10 +93,11 @@
         fragment.append(row);
       }
       list.append(fragment);
+      list.scrollTop = oldScroll;
       if (!filtered.length) list.append(node("div","explorer-empty","Sin coincidencias en los resultados cargados."));
       const total = current.total;
       const exact = Number.isInteger(total) && total >= 0;
-      const suffix = exact ? " / " + total.toLocaleString("es-US") : "";
+      const suffix = exact ? " / " + (current.approximate ? "≈ " : "") + total.toLocaleString("es-US") : "";
       count.textContent = current.items.length.toLocaleString("es-US") + suffix + " cargados";
       const hasMore = Boolean(current.nextPage);
       load.hidden = !hasMore; load.disabled = busy;
@@ -110,8 +112,9 @@
         const next = await callbacks.onMore(current);
         if (!next || !Array.isArray(next.items)) throw Error("La siguiente página no devolvió una lista válida.");
         const seen = new Set(current.items.map(x => x.id).filter(Boolean));
-        current.items.push(...next.items.filter(x => !x.id || !seen.has(x.id)));
-        current.nextPage = next.nextPage || null;
+        const unique = next.items.filter(x => !x.id || !seen.has(x.id));
+        current.items.push(...unique);
+        current.nextPage = unique.length === 0 && next.nextPage === current.nextPage ? null : next.nextPage || null;
         if(Number.isInteger(next.total)) current.total = next.total;
         paint();
       } catch(e) {
