@@ -61,7 +61,7 @@
     return true;
   }
   window.JarvisElevenAgent = Object.freeze({
-    start, stop, send, get connected() { return !!session; },
+    start, stop, send, preload: sdk, get connected() { return !!session; },
     get connecting() { return connecting; }, id: AGENT_ID
   });
 })();
