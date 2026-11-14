@@ -68,3 +68,8 @@ test/                pruebas de humo con APIs simuladas
 docs/                arquitectura y seguridad
 CLAUDE.md            instrucciones para seguir construyendo con Claude Code
 ```
+
+## Modo directo con JobTread (sin Claude)
+El backend admite `JOBTREAD_GRANT_KEY` aunque no exista `ANTHROPIC_API_KEY`. La ruta `POST /api/ask` consulta proyectos y tareas/documentos mediante consultas Pave fijas de solo lectura. `GET /api/projects` muestra proyectos reales sin configurar `PINNED_JOBS`.
+
+Pruebas: `npm run check && npm test`. Para exponer el servidor, configura autenticación real; el `APP_PASSCODE` del ejemplo no reemplaza seguridad empresarial.

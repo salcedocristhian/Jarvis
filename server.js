@@ -1,6 +1,7 @@
 // Una — servidor local sin dependencias (Node 18+).
 // Sirve /public y expone una API pequeña. Las llaves viven solo aquí, nunca en el navegador.
 import http from "node:http";
+import "./public/jobtread-direct.js";
 import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -118,8 +119,14 @@ function parseFinal(text) {
   }
   return { speech: clean, frames: [{ type: "headline", text: clean.split(/(?<=[.!?])\s/)[0] }], closer: "", project: null };
 }
-async function ask({ messages, lang = "es", owner = "Chris", name = "Una" }) {
-  if (!cfg.anthropicKey) throw Object.assign(new Error("Falta ANTHROPIC_API_KEY en .env."), { code: "not_connected" });
+async function ask({ messages = [], lang = "es", owner = "Chris", name = "Una" }) {
+  if (!cfg.anthropicKey) {
+    if (!cfg.jtKey) throw Object.assign(new Error("Conecta JobTread o Claude en el servidor."), { code: "not_connected" });
+    const last = messages.filter(m => m && m.role === "user").at(-1);
+    return globalThis.JarvisDirect.answer(String(last?.content || "Muéstrame mis proyectos"), {
+      query: jobtread, orgId: await ensureOrg()
+    });
+  }
   if (cfg.jtKey) { try { await ensureOrg(); } catch (e) { log("JobTread org:", e.message); } }
   const convo = messages.slice(-12).map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content).slice(0, 4000) }));
   const sources = new Set();
@@ -153,7 +160,12 @@ async function ask({ messages, lang = "es", owner = "Chris", name = "Una" }) {
 
 /* ---------- Proyectos fijos (satélites) ---------- */
 async function projects() {
-  if (!cfg.jtKey || !cfg.pinned.length) return [];
+  if (!cfg.jtKey) return [];
+  if (!cfg.pinned.length) {
+    const result = await globalThis.JarvisDirect.listJobs(jobtread, await ensureOrg(), 12);
+    return result.jobs.map(j => ({ id: j.id, label: j.name, name: j.name, number: j.number,
+      status: j.status, openTasks: null, pendingDocs: null, urgent: false }));
+  }
   return Promise.all(cfg.pinned.map(async p => {
     try {
       const d = await jobtread({ job: { $: { id: p.id }, name: {}, number: {}, status: {},
