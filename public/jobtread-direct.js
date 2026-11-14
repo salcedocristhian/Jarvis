@@ -50,8 +50,8 @@
           { type: "action", text: "Prueba: muéstrame mis proyectos de JobTread." }],
         sources: [], project: null, closer: "Solo lectura." };
     }
-    const taskRequest = /tarea|pendient(?:e|es)|por vencer|vencid|to.?do|actividades|task/i.test(q);
     const docRequest = /document|factura|invoice|orden(?:es)?|aprobaci|bill|submittal/i.test(q);
+    const taskRequest = !docRequest && /tarea|pendient(?:e|es)|por vencer|vencid|to.?do|actividades|task/i.test(q);
     const financialRequest = /presupuesto|budget|gasto|costo|saldo|pago|financiero|profit|invoice total|total de facturas/i.test(q);
     const { jobs, total } = await listJobs(query, orgId, 40);
     if (!jobs.length) return finish("La conexión respondió, pero no encontré proyectos disponibles con este Grant Key.",
