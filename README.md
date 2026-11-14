@@ -87,3 +87,23 @@ Desde Ajustes → Voz, elige **ElevenAgents · conversación (sin API Key)** (se
 **Privacidad:** el agente procesa las transcripciones y los resúmenes de resultados de JobTread que narra. No recibe el Grant Key, pero puede recibir nombres y detalles de proyectos privados; evita datos sensibles y usa un ambiente de pruebas hasta instalar un backend corporativo con inicio de sesión. El agente tiene audio no grabado y retención de conversaciones de 1 día, según la configuración de ElevenLabs. No publiques secretos en GitHub. Si necesitas acceso real multi-dispositivo sin volver a pegar credenciales, todavía hace falta un servidor autenticado: el sitio GitHub Pages no puede guardar llaves privadas de forma segura.
 
 La opción antigua ElevenLabs TTS con API Key y Voice ID permanece disponible para usuarios que ya la tenían configurada.
+
+## Gmail de solo lectura (piloto con Google OAuth)
+
+El sitio publicado permite conectar **una cuenta de Gmail con consentimiento de Google**, sin guardar contraseña ni token de acceso en GitHub. Con Google conectado, el agente ElevenAgents tiene una herramienta `gmail_read` que consulta **solo remitente, asunto, fecha y un extracto** de hasta cinco correos y muestra tarjetas animadas. Puede interpretar «¿cuáles son mis correos recientes?», «¿qué correos no he leído?» y búsquedas por dirección remitente. **No envía, borra, etiqueta ni modifica correos**, no descarga adjuntos ni hace análisis de archivos PDF todavía.
+
+**Activación requerida por el propietario de Gmail**:
+1. En [Google Cloud Console](https://console.cloud.google.com/), crea o elige un proyecto de Google Cloud.
+2. Habilita la **Gmail API** en APIs & Services.
+3. Configura **Google Auth Platform → Branding / Audience / Data Access**, incluido el ámbito restringido `https://www.googleapis.com/auth/gmail.readonly`; si la aplicación está en modo Testing, agrega el Gmail que vas a utilizar como **test user**. Google podría pedir verificación del proyecto para un uso externo/producción.
+4. En **Clients**, crea un cliente **OAuth 2.0 → Web application**. Registra exactamente `https://salcedocristhian.github.io` en **Authorized JavaScript origins**. No incluyas la ruta `/Jarvis` en el origen.
+5. Copia el **OAuth Client ID** (identificador público `…apps.googleusercontent.com`) y colócalo en **Jarvis → Ajustes → Google OAuth Client ID**. Pulsa **Conectar Gmail con Google**, elige tu cuenta y autoriza el acceso **solo lectura**.
+6. Luego pregunta con el orbe: «Jarvis, dime cuáles son mis últimos correos de Gmail».
+
+**Seguridad y límites:** Google Identity Services controla el consentimiento. Solo guardamos el *OAuth Client ID público* en `localStorage`. El token de acceso temporal existe **solo en memoria**, expira y se pierde al cerrar/actualizar la página. No se almacena una contraseña, un refresh token ni un client secret. Las respuestas habladas comparten extractos y asuntos de mensajes con ElevenLabs; no uses esta prueba con correo confidencial que no desees compartir con el proveedor. Google puede restringir el acceso a ámbitos de Gmail o solicitar verificación; este código **no equivale a una conexión activada** hasta que el titular configure OAuth y apruebe el permiso. Para acceso privado permanente entre iPhone/Edge y lecturas en segundo plano se requiere backend con OAuth de servidor y autenticación propia, no GitHub Pages estático.
+
+## Reparación: tarjetas de JobTread con voz ElevenAgents
+
+Los registros de la conversación de Jarvis mostraron que la herramienta `jobtread_read` sí recibió datos de la organización, pero el agente a veces terminó el turno sin narrar. El prompt de ElevenAgents ahora obliga a leer el texto verificado después de cada herramienta, y el cliente tiene un segundo mecanismo de narración si el modelo no produce respuesta oral tras el retorno de la consulta. No vuelve a pedir los datos ni inventa cifras. Además, la consulta usa filtros `where: ["name","like","%término%"]` del Pave API para encontrar proyectos fuera de los 40 más recientes; si no hay coincidencia confirmada, indica que no pudo localizarlo en vez de sustituirlo por otro.
+
+La búsqueda de proyectos y Gmail están diseñadas para **solo lectura**. Las pruebas automáticas usan datos simulados, nunca las llaves reales del usuario; la prueba final de micrófono y OAuth debe hacerse desde Safari o Edge.

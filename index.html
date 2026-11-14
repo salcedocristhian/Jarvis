@@ -228,6 +228,17 @@ window.UNA_CONFIG = {
     <label class="opt col">Llave de ElevenLabs TTS (opcional; no necesaria con ElevenAgents)<input id="kEleven" type="password" autocomplete="off"></label>
     <label class="opt col">Voice ID para TTS manual (opcional)<input id="kVoice" autocomplete="off"></label>
   </div>
+  <h2>Gmail (solo lectura).</h2>
+  <p class="muted small">Conecta tu cuenta directamente con Google. Jamás escribas tu contraseña aquí. Google solicitará tu autorización.</p>
+  <label class="opt col">Google OAuth Client ID (público)
+    <input id="gmailClientId" autocomplete="off" placeholder="123456789-abc.apps.googleusercontent.com">
+  </label>
+  <div class="btnrow">
+    <button class="btn primary" type="button" id="gmailConnect">Conectar Gmail con Google</button>
+    <button class="btn ghost" type="button" id="gmailDisconnect">Desconectar Gmail</button>
+  </div>
+  <p class="muted small" id="gmailStatus">No conectado. Requiere OAuth Client ID web, Gmail API habilitada y autorización de Google. No guarda tokens entre sesiones.</p>
+  <p class="muted small">En <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noopener noreferrer">Google Cloud · Clients</a>, registra el origen <b>https://salcedocristhian.github.io</b> para un cliente OAuth de tipo Web. Configura la pantalla de consentimiento y tu usuario de prueba si corresponde.</p>
   <div class="btnrow"><button class="btn primary" type="button" id="testBtn">Probar conexiones</button><button class="btn ghost" type="button" id="forget">Borrar llaves</button></div>
   <ul class="conns" id="testOut"></ul>
   <p class="muted small">Mantén presionado el orbe para escribir. Desliza hacia abajo para despejar la pantalla.</p>
@@ -235,6 +246,8 @@ window.UNA_CONFIG = {
 
 <script src="./public/jobtread-direct.js"></script>
 <script src="./public/eleven-agent-client.js"></script>
+<script src="https://accounts.google.com/gsi/client" id="google-identity-services" async defer></script>
+<script src="./public/gmail-readonly.js"></script>
 <script>
 /* Una — cliente. Sin dependencias. */
 (() => {
@@ -417,6 +430,7 @@ async function testConnections() {
   const out = $("#testOut"); out.innerHTML = `<li><span class="muted">Probando…</span></li>`; out.scrollIntoView({ block: "end", behavior: "smooth" }); out.innerHTML = "";
   const row = (n, ok, msg) => out.insertAdjacentHTML("beforeend", `<li><span>${n}</span><span class="${ok ? "ok" : "no"}">${esc(msg)}</span></li>`);
   row("ElevenAgents", true, "Configurado sin API Key; toca el orbe para probar la voz");
+  row("Gmail", Boolean(window.JarvisGmail?.connected), window.JarvisGmail?.connected ? "Autorizado por Google en esta sesión" : "Sin autorizar. Pulsa Conectar Gmail con Google");
   if (keys.claude) { try { await claudeCall({ model: keys.model, max_tokens: 5, messages: [{ role: "user", content: "di ok" }] }); row("Claude", true, "Funciona"); } catch (e) { row("Claude", false, e.message); } }
   else row("Claude", false, "Falta la llave");
   if (keys.jobtread) { try { orgId = null; jtMode = "json"; await ensureOrg(); row("JobTread", true, "Funciona desde este teléfono"); } catch (e) { row("JobTread", false, e.code === "cors" ? "Bloquea el navegador: necesitará servidor" : e.message); } }
@@ -735,8 +749,18 @@ function clearReel() {
    No ElevenLabs API key is needed in GitHub Pages or this iPhone.
    The JobTread Grant Key, when present, remains on this device. */
 const agentClient = window.JarvisElevenAgent;
+const gmailClient = window.JarvisGmail;
 const useAgentVoice = () => prefs.voice === "agent" || (prefs.voice === "eleven" && !keys.eleven);
 let agentLastQuestion = "";
+let agentResponseSequence = 0, agentPendingRead = 0;
+function narrateVerifiedResult(out, source) {
+  const observed = agentResponseSequence, readId = ++agentPendingRead;
+  setTimeout(() => {
+    if (readId !== agentPendingRead || !agentClient?.connected || agentResponseSequence !== observed) return;
+    agentClient.send("LECTURA_VERIFICADA: " + String(out.speech || "").slice(0, 500));
+    stateEl.textContent = "Narrando respuesta verificada de " + source;
+  }, 3600);
+}
 function agentErrorMessage(e) {
   const msg = e?.message || String(e || "Error de ElevenAgents");
   return /failed to fetch|load|network|import/i.test(msg)
@@ -761,6 +785,8 @@ async function agentJobTreadRead({ question } = {}) {
     const out = await askJobTreadDirect(q);
     showReel(out);
     timeline.unshift({ q, a: out.speech }); renderHistory();
+    // A verified result is read aloud if ElevenAgents stays silent.
+    narrateVerifiedResult(out, "JobTread");
     return { ok: out.sources?.includes("JobTread") || false, speech: out.speech,
       project: out.project || null, sources: out.sources || [] };
   } catch (e) {
@@ -770,6 +796,55 @@ async function agentJobTreadRead({ question } = {}) {
     return { ok: false, speech: message };
   }
 }
+
+/* Gmail only returns sender, subject and short snippet after explicit Google OAuth.
+   The access token NEVER leaves this browser for ElevenLabs. */
+async function agentGmailRead({ question } = {}) {
+  const q = String(question || agentLastQuestion || "¿Cuáles son mis últimos correos?").slice(0, 500);
+  if (!gmailClient?.connected) {
+    const out = {
+      speech: "Gmail todavía no está conectado en este navegador. Abre Ajustes y pulsa Conectar Gmail con Google para autorizar el acceso de solo lectura.",
+      frames: [{ type: "headline", text: "Gmail necesita autorización de Google." },
+        { type: "action", text: "Ajustes · Gmail · Conectar Gmail con Google" }],
+      closer: "Sin permiso de Google no puedo leer tus correos."
+    };
+    showReel(out); narrateVerifiedResult(out, "Gmail");
+    return { ok: false, speech: out.speech };
+  }
+  try {
+    setPhase("thinking", "Consultando Gmail");
+    let filter = "in:inbox";
+    if (/no le[ií]d|sin leer|unread/i.test(q)) filter = "in:inbox is:unread";
+    else if (/enviad|sent/i.test(q)) filter = "in:sent";
+    const from = q.match(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/);
+    if (from) filter += " from:" + from[0];
+    const data = await gmailClient.messages(filter, 5);
+    const emails = data.messages;
+    const subjects = emails.slice(0, 3).map(m => m.subject || "Sin asunto");
+    const speech = emails.length
+      ? "Encontré " + emails.length + " correos en Gmail. Los primeros asuntos son: " + subjects.join("; ") + "."
+      : "No encontré correos que coincidan con la búsqueda solicitada.";
+    const out = { speech,
+      frames: [{ type: "headline", text: "Gmail · " + (filter.includes("unread") ? "No leídos" : "Correos recientes") },
+        ...emails.slice(0, 5).map(m => ({
+          type: "insight", tag: "GMAIL · SOLO LECTURA", title: m.subject || "Sin asunto",
+          value: m.from || "Remitente no indicado", note: m.snippet || m.date || "Sin extracto"
+        }))],
+      closer: "Datos de Gmail autorizados en este navegador. Sin modificar correos." };
+    showReel(out);
+    timeline.unshift({ q, a: out.speech }); renderHistory();
+    narrateVerifiedResult(out, "Gmail");
+    // Only derived metadata, NEVER the access token.
+    return { ok: true, speech: out.speech, count: emails.length, sources: ["Gmail"] };
+  } catch (e) {
+    const message = "No pude consultar Gmail: " + String(e.message || e).slice(0, 130);
+    const out = { speech: message, frames: [{ type: "headline", text: "Consulta de Gmail no disponible." },
+      { type: "evidence", title: message, source: "Gmail" }] };
+    showReel(out); narrateVerifiedResult(out, "Gmail");
+    return { ok: false, speech: out.speech };
+  }
+}
+
 async function startAgentVoice(optionalQuestion = "") {
   if (!agentClient) { setPhase("idle", "ElevenAgents no cargó."); return; }
   if (agentClient.connected) {
@@ -783,7 +858,7 @@ async function startAgentVoice(optionalQuestion = "") {
   agentLastQuestion = optionalQuestion;
   try {
     const session = await agentClient.start({
-      clientTools: { jobtread_read: agentJobTreadRead },
+      clientTools: { jobtread_read: agentJobTreadRead, gmail_read: agentGmailRead },
       onConnect: () => { talking = true; document.body.classList.add("talking"); setPhase("listening", "ElevenAgents conectado"); renderConns(); },
       onDisconnect: () => { talking = false; document.body.classList.remove("talking"); setPhase("idle"); renderConns(); },
       onModeChange: m => {
@@ -795,6 +870,7 @@ async function startAgentVoice(optionalQuestion = "") {
         if (!m?.text) return;
         if (m.speaker === "user") { agentLastQuestion = m.text; heardEl.textContent = m.text; }
         else if (m.speaker === "agent") {
+          agentResponseSequence++;
           heardEl.textContent = m.text;
           if (!reel.hidden) return;
           timeline.unshift({ q: agentLastQuestion, a: m.text }); renderHistory();
@@ -812,6 +888,7 @@ async function startAgentVoice(optionalQuestion = "") {
   }
 }
 async function stopAgentVoice() {
+  agentPendingRead++;
   try { await agentClient?.stop(); } catch (e) { console.warn("ElevenAgents:", e.message); }
   talking = false; document.body.classList.remove("talking"); setPhase("idle"); renderConns();
 }
@@ -873,9 +950,9 @@ function renderHistory() {
   $("#hist").innerHTML = timeline.length ? timeline.slice(0, 20).map(t => `<p class="q">${esc(t.q)}</p><p class="a">${esc(t.a)}</p>`).join("") : `<p class="muted">Todavía no han hablado.</p>`;
 }
 function renderConns() {
-  const names = { agent: "ElevenAgents · voz", claude: "Claude", jobtread: "JobTread", elevenlabs: "ElevenLabs TTS", outlook: "Outlook" };
+  const names = { agent: "ElevenAgents · voz", jobtread: "JobTread", gmail: "Gmail", claude: "Claude", elevenlabs: "ElevenLabs TTS", outlook: "Outlook" };
   $("#conns").innerHTML = Object.entries(names).map(([k, n]) => {
-    const s = k === "agent" ? (window.JarvisElevenAgent?.connected ? "connected" : "ready") : (demo ? "demo" : status[k] || "not_connected");
+    const s = k === "agent" ? (window.JarvisElevenAgent?.connected ? "connected" : "ready") : k === "gmail" ? (gmailClient?.connected ? "connected" : "not_connected") : (demo ? "demo" : status[k] || "not_connected");
     return `<li><span>${n}</span><span class="${s === "connected" || s === "ready" ? "ok" : "no"}">${{ connected: "Conectado", ready: "Sin llave · toca el orbe", not_connected: "Sin conectar", demo: "Demo" }[s] || s}</span></li>`;
   }).join("");
 }
@@ -886,6 +963,27 @@ bind("#optVoice", "voice", () => { if (agentClient?.connected) stopAgentVoice();
   el.addEventListener("change", () => { store.set(k, el.value.trim()); orgId = null; jtMode = "json"; });
 });
 $("#testBtn").addEventListener("click", testConnections);
+const gmailIdInput = $("#gmailClientId"), gmailStatusEl = $("#gmailStatus");
+gmailIdInput.value = store.get("gmail.clientId", "");
+gmailIdInput.addEventListener("change", () => store.set("gmail.clientId", gmailIdInput.value.trim()));
+$("#gmailConnect").addEventListener("click", async () => {
+  const id = gmailIdInput.value.trim();
+  store.set("gmail.clientId", id); // Public client identifier, NOT a secret.
+  gmailStatusEl.textContent = "Solicitando autorización directamente a Google…";
+  try {
+    await gmailClient.connect(id);
+    gmailStatusEl.textContent = "Gmail autorizado solo para lectura en esta sesión. Puedes preguntar por tus correos.";
+    renderConns();
+  } catch (e) {
+    gmailStatusEl.textContent = "Gmail sin conectar: " + String(e.message || e).slice(0, 200);
+    renderConns();
+  }
+});
+$("#gmailDisconnect").addEventListener("click", () => {
+  gmailClient.disconnect();
+  gmailStatusEl.textContent = "Gmail desconectado de esta sesión.";
+  renderConns();
+});
 $("#forget").addEventListener("click", () => { if (!confirm("¿Borrar todas las llaves de este teléfono?")) return; ["k.claude","k.jobtread","k.eleven","k.voiceId"].forEach(k => { store.set(k, ""); }); location.reload(); });
 
 /* --- DEMO REAL: READ-ONLY GITHUB DATA. No secret keys or invented financial data. --- */
@@ -1002,7 +1100,7 @@ async function demoAnswer(q) {
 async function boot() {
   if (prefs.voice === "eleven" && !keys.eleven) { prefs.voice = "agent"; store.set("voice", "agent"); $("#optVoice").value = "agent"; }
   demo = /[?&]demo\b/.test(location.search) || (!keys.claude && !keys.jobtread);
-  status = { agent: "ready", claude: keys.claude ? "connected" : "not_connected", jobtread: keys.jobtread ? "connected" : "not_connected", elevenlabs: keys.eleven && keys.voiceId ? "connected" : "not_connected", outlook: "not_connected" };
+  status = { agent: "ready", gmail: gmailClient?.connected ? "connected" : "not_connected", claude: keys.claude ? "connected" : "not_connected", jobtread: keys.jobtread ? "connected" : "not_connected", elevenlabs: keys.eleven && keys.voiceId ? "connected" : "not_connected", outlook: "not_connected" };
   $("#demoTag").hidden = !demo;
   renderConns();
   try { projects = demo ? DEMO_PROJECTS : keys.jobtread ? await loadDirectProjects() : []; }

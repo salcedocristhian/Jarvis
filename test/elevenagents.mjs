@@ -6,7 +6,7 @@ const root = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const src = await readFile(new URL("../public/eleven-agent-client.js", import.meta.url), "utf8");
 assert.ok(root.includes('<script src="./public/eleven-agent-client.js"></script>'));
 assert.ok(root.includes('ElevenAgents · conversación (sin API Key)'));
-assert.ok(root.includes('clientTools: { jobtread_read: agentJobTreadRead }'));
+assert.ok(root.includes('clientTools: { jobtread_read: agentJobTreadRead, gmail_read: agentGmailRead }'));
 assert.ok(root.includes('if (useAgentVoice()) startAgentVoice(q); else turn(q);'));
 assert.ok(root.includes('if (useAgentVoice()) { if (agentClient?.connected) return stopAgentVoice(); return startAgentVoice(); }'));
 assert.ok(root.includes('if (!keys.jobtread) {'));
