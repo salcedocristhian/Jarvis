@@ -210,7 +210,7 @@ window.UNA_CONFIG = {
   <div class="grab"></div>
   <h2>Ajustes.</h2>
   <label class="opt">Voz
-    <select id="optVoice"><option value="eleven">ElevenLabs</option><option value="browser">Del navegador</option><option value="off">Silencio (solo texto)</option></select>
+    <select id="optVoice"><option value="agent">ElevenAgents · conversación (sin API Key)</option><option value="eleven">ElevenLabs TTS · llave personal</option><option value="browser">Del navegador</option><option value="off">Silencio (solo texto)</option></select>
   </label>
   <label class="opt">Idioma
     <select id="optLang"><option value="es-US">Español</option><option value="en-US">English</option></select>
@@ -219,14 +219,14 @@ window.UNA_CONFIG = {
     <select id="optMotion"><option value="full">Completo</option><option value="calm">Calmado</option></select>
   </label>
   <h2>Conexiones.</h2>
-  <p class="muted small">Se guardan solo en este teléfono. Nunca van a GitHub.</p>
+  <p class="muted small">La voz ElevenAgents funciona sin llave. Para ver datos privados de JobTread, debes autorizar esta sesión en cada navegador (Grant Key).</p>
   <div class="keys">
     <label class="opt col">Llave de Claude<input id="kClaude" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
     <label class="opt col">Modelo<input id="kModel" autocomplete="off"></label>
     <label class="opt col">Grant key de JobTread<input id="kJob" type="password" autocomplete="off"></label>
     <label class="opt col">Proyectos fijos<input id="kPins" autocomplete="off" placeholder="id|Nombre,id|Nombre"></label>
-    <label class="opt col">Llave de ElevenLabs (opcional)<input id="kEleven" type="password" autocomplete="off"></label>
-    <label class="opt col">Voice ID de ElevenLabs<input id="kVoice" autocomplete="off"></label>
+    <label class="opt col">Llave de ElevenLabs TTS (opcional; no necesaria con ElevenAgents)<input id="kEleven" type="password" autocomplete="off"></label>
+    <label class="opt col">Voice ID para TTS manual (opcional)<input id="kVoice" autocomplete="off"></label>
   </div>
   <div class="btnrow"><button class="btn primary" type="button" id="testBtn">Probar conexiones</button><button class="btn ghost" type="button" id="forget">Borrar llaves</button></div>
   <ul class="conns" id="testOut"></ul>
@@ -234,6 +234,7 @@ window.UNA_CONFIG = {
 </dialog>
 
 <script src="./public/jobtread-direct.js"></script>
+<script src="./public/eleven-agent-client.js"></script>
 <script>
 /* Una — cliente. Sin dependencias. */
 (() => {
@@ -249,7 +250,7 @@ const store = {
   set(k, v) { try { localStorage.setItem("una." + k, v); } catch {} },
 };
 const prefs = {
-  voice: store.get("voice", "eleven"),
+  voice: store.get("voice", "agent"),
   lang: store.get("lang", C.lang || "es-US"),
   motion: store.get("motion", sysReduced ? "calm" : "full"),
   pass: store.get("pass", ""),
@@ -415,6 +416,7 @@ async function loadDirectProjects() {
 async function testConnections() {
   const out = $("#testOut"); out.innerHTML = `<li><span class="muted">Probando…</span></li>`; out.scrollIntoView({ block: "end", behavior: "smooth" }); out.innerHTML = "";
   const row = (n, ok, msg) => out.insertAdjacentHTML("beforeend", `<li><span>${n}</span><span class="${ok ? "ok" : "no"}">${esc(msg)}</span></li>`);
+  row("ElevenAgents", true, "Configurado sin API Key; toca el orbe para probar la voz");
   if (keys.claude) { try { await claudeCall({ model: keys.model, max_tokens: 5, messages: [{ role: "user", content: "di ok" }] }); row("Claude", true, "Funciona"); } catch (e) { row("Claude", false, e.message); } }
   else row("Claude", false, "Falta la llave");
   if (keys.jobtread) { try { orgId = null; jtMode = "json"; await ensureOrg(); row("JobTread", true, "Funciona desde este teléfono"); } catch (e) { row("JobTread", false, e.code === "cors" ? "Bloquea el navegador: necesitará servidor" : e.message); } }
@@ -545,7 +547,7 @@ function pickVoice(lang) {
 synth?.getVoices(); if (synth) synth.onvoiceschanged = () => synth.getVoices();
 let speakTick = null, stopSpeaking = () => {};
 async function say(text) {
-  if (!text || prefs.voice === "off") return;
+  if (!text || prefs.voice === "off" || (useAgentVoice() && agentClient?.connected)) return;
   const plain = text.replace(/\*\*/g, "").replace(/https?:\S+/g, "").slice(0, 2400);
   setPhase("speaking");
   speakTick = setInterval(() => { energyTarget = .5 + Math.random() * .5; }, 110);
@@ -681,7 +683,7 @@ function frameHTML(f) {
     case "action":
       return `<div class="frame f-action"><div class="mark"></div><h3>${esc(f.text)}</h3></div>`;
     default:
-      return `<div class="frame f-headline"><h3>${esc(f.text || "").split(" ").map((w, i) => `<span class="w" style="transition-delay:${i * 70}ms">${w}</span>`).join(" ")}</h3></div>`;
+      return `<div class="frame f-headline"><h3>${esc(f.text || "").split(" ").map((w, i) => `<span class="w" style="transition-delay:${i * 70}ms">${esc(w)}</span>`).join(" ")}</h3></div>`;
   }
 }
 function go(i) {
@@ -727,6 +729,93 @@ function clearReel() {
   setTimeout(() => { reel.hidden = true; reel.classList.remove("absorb"); framesEl.innerHTML = ""; heardEl.textContent = ""; document.body.classList.remove("docked"); }, calm() ? 10 : 650);
 }
 
+
+/* ---------------- ElevenAgents + JobTread read-only ----------------
+   The agent's speech comes from ElevenLabs, not browser speechSynthesis.
+   No ElevenLabs API key is needed in GitHub Pages or this iPhone.
+   The JobTread Grant Key, when present, remains on this device. */
+const agentClient = window.JarvisElevenAgent;
+const useAgentVoice = () => prefs.voice === "agent" || (prefs.voice === "eleven" && !keys.eleven);
+let agentLastQuestion = "";
+function agentErrorMessage(e) {
+  const msg = e?.message || String(e || "Error de ElevenAgents");
+  return /failed to fetch|load|network|import/i.test(msg)
+    ? "No pude cargar ElevenAgents. Revisa Internet, abre Jarvis directamente en Safari o Edge e inténtalo otra vez."
+    : "No pude iniciar ElevenAgents: " + msg.slice(0, 180);
+}
+async function agentJobTreadRead({ question } = {}) {
+  const q = String(question || agentLastQuestion || "Muéstrame mis proyectos de JobTread").trim().slice(0, 500);
+  if (demo && /[?&]demo\b/.test(location.search)) {
+    return { ok: false, speech: "Estás en modo DEMO explícito. Abre Jarvis sin ?demo=1 para consultas privadas." };
+  }
+  if (!keys.jobtread) {
+    const out = { speech: "No encuentro el Grant Key de JobTread en este navegador. Entra en Ajustes y conéctalo para consultar tus proyectos.", frames: [
+      { type: "headline", text: "JobTread necesita autorización en este dispositivo." },
+      { type: "action", text: "Abre Ajustes · Grant key de JobTread · Probar conexiones" }
+    ], closer: "La voz funciona sin llave. JobTread necesita autorización." };
+    showReel(out);
+    return { ok: false, speech: out.speech };
+  }
+  try {
+    setPhase("thinking", "Consultando JobTread");
+    const out = await askJobTreadDirect(q);
+    showReel(out);
+    timeline.unshift({ q, a: out.speech }); renderHistory();
+    return { ok: out.sources?.includes("JobTread") || false, speech: out.speech,
+      project: out.project || null, sources: out.sources || [] };
+  } catch (e) {
+    const message = "JobTread no respondió: " + String(e.message || e).slice(0, 140);
+    showReel({ speech: message, frames: [{ type: "headline", text: "No se pudo consultar JobTread." },
+      { type: "evidence", title: message, source: "JobTread" }] });
+    return { ok: false, speech: message };
+  }
+}
+async function startAgentVoice(optionalQuestion = "") {
+  if (!agentClient) { setPhase("idle", "ElevenAgents no cargó."); return; }
+  if (agentClient.connected) {
+    if (optionalQuestion) { agentLastQuestion = optionalQuestion; agentClient.send(optionalQuestion); }
+    return;
+  }
+  if (agentClient.connecting) return;
+  stopListening(); stopSpeaking();
+  if (!reel.hidden) clearReel();
+  setPhase("thinking", "Conectando la voz ElevenAgents…");
+  agentLastQuestion = optionalQuestion;
+  try {
+    const session = await agentClient.start({
+      clientTools: { jobtread_read: agentJobTreadRead },
+      onConnect: () => { talking = true; document.body.classList.add("talking"); setPhase("listening", "ElevenAgents conectado"); renderConns(); },
+      onDisconnect: () => { talking = false; document.body.classList.remove("talking"); setPhase("idle"); renderConns(); },
+      onModeChange: m => {
+        const mode = String(m?.mode || m || "");
+        if (mode === "speaking") setPhase("speaking");
+        else if (mode === "listening") setPhase("listening");
+      },
+      onMessage: m => {
+        if (!m?.text) return;
+        if (m.speaker === "user") { agentLastQuestion = m.text; heardEl.textContent = m.text; }
+        else if (m.speaker === "agent") {
+          heardEl.textContent = m.text;
+          if (!reel.hidden) return;
+          timeline.unshift({ q: agentLastQuestion, a: m.text }); renderHistory();
+        }
+      },
+      onError: e => { stateEl.textContent = agentErrorMessage(e); },
+    });
+    if (optionalQuestion && session) session.sendUserMessage(optionalQuestion);
+  } catch (e) {
+    talking = false; document.body.classList.remove("talking");
+    const msg = agentErrorMessage(e);
+    showReel({ speech: msg, frames: [{ type: "headline", text: "Voz ElevenAgents no disponible." },
+      { type: "evidence", title: msg, source: "Revisa conexión del navegador" }] });
+    setPhase("idle", msg);
+  }
+}
+async function stopAgentVoice() {
+  try { await agentClient?.stop(); } catch (e) { console.warn("ElevenAgents:", e.message); }
+  talking = false; document.body.classList.remove("talking"); setPhase("idle"); renderConns();
+}
+
 /* ---------------- gestos ---------------- */
 const orb = $("#orb");
 let pressT = null, longPressed = false;
@@ -737,6 +826,7 @@ orb.addEventListener("click", e => {
   if (longPressed) return;
   const hit = sats.find(s => Math.hypot(s.x - e.clientX, s.y - e.clientY) < 24);
   if (hit) return askAbout(hit.p);
+  if (useAgentVoice()) { if (agentClient?.connected) return stopAgentVoice(); return startAgentVoice(); }
   if (phase === "speaking") { stopSpeaking(); return; }       // tocar mientras habla = interrumpir
   if (talking) return endTalk();
   if (!reel.hidden) clearReel();
@@ -745,7 +835,7 @@ orb.addEventListener("click", e => {
 function askAbout(p) {
   unlockAudio(); stopListening(); stopSpeaking();
   const q = prefs.lang.startsWith("en") ? `How is ${p.label} going?` : `¿Cómo va ${p.label}?`;
-  turn(q);
+  if (useAgentVoice()) startAgentVoice(q); else turn(q);
 }
 let touchY = null;
 document.addEventListener("touchstart", e => { touchY = e.touches[0].clientY; }, { passive: true });
@@ -756,7 +846,7 @@ document.addEventListener("touchend", e => {
   else if (dy < -90 && !$("#typer").contains(e.target)) openSheet("menu");
 }, { passive: true });
 addEventListener("keydown", e => {
-  if (e.key === "Escape") { if (talking) endTalk(); clearReel(); closeTyper(); }
+  if (e.key === "Escape") { if (agentClient?.connected) stopAgentVoice(); else if (talking) endTalk(); clearReel(); closeTyper(); }
   if (e.key === " " && e.target === document.body) { e.preventDefault(); orb.click(); }
   if (!reel.hidden && (e.key === "ArrowRight" || e.key === "ArrowLeft")) { clearTimeout(reelTimer); go(reelIdx + (e.key === "ArrowRight" ? 1 : -1)); }
 });
@@ -766,7 +856,7 @@ function openTyper() { $("#typer").hidden = false; $("#typeIn").focus(); }
 function closeTyper() { $("#typer").hidden = true; }
 $("#typer").addEventListener("submit", e => {
   e.preventDefault(); const q = $("#typeIn").value.trim(); if (!q) return;
-  $("#typeIn").value = ""; closeTyper(); unlockAudio(); stopListening(); turn(q);
+  $("#typeIn").value = ""; closeTyper(); unlockAudio(); stopListening(); if (useAgentVoice()) startAgentVoice(q); else turn(q);
 });
 
 /* ---------------- hojas: menú y ajustes ---------------- */
@@ -783,14 +873,14 @@ function renderHistory() {
   $("#hist").innerHTML = timeline.length ? timeline.slice(0, 20).map(t => `<p class="q">${esc(t.q)}</p><p class="a">${esc(t.a)}</p>`).join("") : `<p class="muted">Todavía no han hablado.</p>`;
 }
 function renderConns() {
-  const names = { claude: "Claude", jobtread: "JobTread", elevenlabs: "ElevenLabs", outlook: "Outlook" };
+  const names = { agent: "ElevenAgents · voz", claude: "Claude", jobtread: "JobTread", elevenlabs: "ElevenLabs TTS", outlook: "Outlook" };
   $("#conns").innerHTML = Object.entries(names).map(([k, n]) => {
-    const s = demo ? "demo" : status[k] || "not_connected";
-    return `<li><span>${n}</span><span class="${s === "connected" ? "ok" : "no"}">${{ connected: "Conectado", not_connected: "Sin conectar", demo: "Demo" }[s] || s}</span></li>`;
+    const s = k === "agent" ? (window.JarvisElevenAgent?.connected ? "connected" : "ready") : (demo ? "demo" : status[k] || "not_connected");
+    return `<li><span>${n}</span><span class="${s === "connected" || s === "ready" ? "ok" : "no"}">${{ connected: "Conectado", ready: "Sin llave · toca el orbe", not_connected: "Sin conectar", demo: "Demo" }[s] || s}</span></li>`;
   }).join("");
 }
 const bind = (id, key, after) => { const el = $(id); el.value = prefs[key]; el.addEventListener("change", () => { prefs[key] = el.value; store.set(key, el.value); after?.(); }); };
-bind("#optVoice", "voice"); bind("#optLang", "lang", () => setPhase(phase)); bind("#optMotion", "motion");
+bind("#optVoice", "voice", () => { if (agentClient?.connected) stopAgentVoice(); }); bind("#optLang", "lang", () => setPhase(phase)); bind("#optMotion", "motion");
 [["#kClaude","k.claude"],["#kModel","k.model"],["#kJob","k.jobtread"],["#kPins","k.pinned"],["#kEleven","k.eleven"],["#kVoice","k.voiceId"]].forEach(([id,k]) => {
   const el = $(id); el.value = store.get(k, k === "k.model" ? "claude-sonnet-5-5" : "");
   el.addEventListener("change", () => { store.set(k, el.value.trim()); orgId = null; jtMode = "json"; });
@@ -910,15 +1000,16 @@ async function demoAnswer(q) {
 
 /* ---------------- arranque ---------------- */
 async function boot() {
+  if (prefs.voice === "eleven" && !keys.eleven) { prefs.voice = "agent"; store.set("voice", "agent"); $("#optVoice").value = "agent"; }
   demo = /[?&]demo\b/.test(location.search) || (!keys.claude && !keys.jobtread);
-  status = { claude: keys.claude ? "connected" : "not_connected", jobtread: keys.jobtread ? "connected" : "not_connected", elevenlabs: keys.eleven && keys.voiceId ? "connected" : "not_connected", outlook: "not_connected" };
+  status = { agent: "ready", claude: keys.claude ? "connected" : "not_connected", jobtread: keys.jobtread ? "connected" : "not_connected", elevenlabs: keys.eleven && keys.voiceId ? "connected" : "not_connected", outlook: "not_connected" };
   $("#demoTag").hidden = !demo;
   renderConns();
   try { projects = demo ? DEMO_PROJECTS : keys.jobtread ? await loadDirectProjects() : []; }
   catch (e) { projects = []; stateEl.textContent = "JobTread: " + e.message; }
   if (!demo && keys.jobtread && !keys.claude && projects.length) stateEl.textContent = "JobTread listo · pregunta por tus proyectos";
   renderProjects();
-  if (demo && !keys.jobtread && !store.get("seenSetup", "")) { store.set("seenSetup", "1"); stateEl.textContent = "Modo demo · conecta JobTread o Claude"; }
+  if (demo && !keys.jobtread) stateEl.textContent = "Voz ElevenAgents disponible · JobTread requiere Grant Key en este navegador";
 }
 setPhase("idle"); renderHistory(); boot();
 })();
