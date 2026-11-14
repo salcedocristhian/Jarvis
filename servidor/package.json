@@ -1,0 +1,16 @@
+{
+  "name": "una",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Una: asistente personal por voz. Orbe, motion graphics y conectores (JobTread, Claude, ElevenLabs).",
+  "type": "module",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "check": "node --check server.js && node --check public/app.js && node --check public/config.js",
+    "test": "node test/smoke.mjs"
+  }
+}

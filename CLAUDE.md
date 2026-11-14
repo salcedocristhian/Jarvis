@@ -1,15 +1,17 @@
 # Instrucciones para Claude Code
 
-Este repo es **Una**, el asistente personal por voz de Chris. Es la primera pieza funcional del brief “Personal AI Operating System” (nombre provisional en ese brief: AETHER). Lee `docs/arquitectura.md` y `docs/seguridad.md` antes de cambiar algo.
+Este repo es **Una**. La app publicada es `index.html` en la raíz (GitHub Pages, llaves en el dispositivo). La carpeta `servidor/` es la versión con servidor Node para Render. Mantén ambas con el mismo diseño y el mismo contrato de respuesta.
+
+Este proyecto, el asistente personal por voz de Chris. Es la primera pieza funcional del brief “Personal AI Operating System” (nombre provisional en ese brief: AETHER). Lee `docs/arquitectura.md` y `docs/seguridad.md` antes de cambiar algo.
 
 ## Reglas del proyecto
 
 - La pantalla principal es el orbe. No agregues barras, tarjetas fijas ni chat visible por defecto. Todo resultado entra como cuadros (`frames`) y sale absorbido por el orbe.
-- Las llaves viven solo en `.env` del servidor. Nunca en `public/`, en el repo ni en logs.
+- Las llaves nunca van en el repo. En `index.html` se guardan en el dispositivo; en `servidor/` viven en `.env` o en las variables del servicio.
 - Integraciones de **solo lectura** por defecto. Escribir (enviar correo, crear en JobTread, publicar) requiere una propuesta visible y la aprobación explícita del usuario en la UI antes de ejecutar.
 - No inventes datos. Si un conector no está, la UI lo dice (`not_connected`, `demo`). El modo DEMO siempre muestra la etiqueta DEMO.
 - No toques otros repositorios sin rama, diff y aprobación.
-- Corre `npm run check && npm test` antes de dar algo por terminado.
+- En `servidor/`, corre `npm run check && npm test` antes de dar algo por terminado.
 
 ## Contrato de respuesta (`POST /api/ask`)
 
@@ -27,7 +29,7 @@ Este repo es **Una**, el asistente personal por voz de Chris. Es la primera piez
   "sources": ["JobTread"]
 }
 ```
-Para un nuevo tipo de cuadro: agrégalo al prompt en `server.js` (`systemPrompt`) y a `frameHTML()` en `public/app.js`.
+Para un nuevo tipo de cuadro: agrégalo a `systemPrompt()` y a `frameHTML()` en `index.html`, y lo mismo en `servidor/server.js` y `servidor/public/app.js`.
 
 ## Próximos pasos sugeridos (en orden)
 
@@ -40,4 +42,4 @@ Para un nuevo tipo de cuadro: agrégalo al prompt en `server.js` (`systemPrompt`
 
 ## IDs útiles
 
-Los job IDs reales van en `PINNED_JOBS` del `.env` (no en el código). Formato: `id|Nombre corto,id|Nombre corto`.
+Los job IDs van en Ajustes → Proyectos fijos (o `PINNED_JOBS` en el servidor), no en el código. Formato: `id|Nombre corto,id|Nombre corto`.
