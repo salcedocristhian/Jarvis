@@ -106,7 +106,7 @@
       side.append(span("motion-preview-label",records.kind==="jobs"?"DIRECTORIO AUTORIZADO":"PROYECTO CONSULTADO"));
       const first=records.items[0];
       side.append(span("motion-project-name",records.kind==="jobs"?(first?.title||"Sin proyectos"):
-        (records.title||"Información de proyecto")));
+        (actions.contextTitle||records.title||"Información de proyecto")));
       side.append(span("motion-project-kind",records.kind==="jobs"?
         (first?.detail||"Selecciona un proyecto"):records.title));
       const nodes=div("motion-project-nodes");
