@@ -753,6 +753,30 @@ const gmailClient = window.JarvisGmail;
 const useAgentVoice = () => prefs.voice === "agent" || (prefs.voice === "eleven" && !keys.eleven);
 let agentLastQuestion = "";
 let agentResponseSequence = 0, agentPendingRead = 0;
+let agentToolCount = 0, agentPseudoToolTimer = null;
+function noteRealToolCall() {
+  agentToolCount++;
+  clearTimeout(agentPseudoToolTimer);
+  agentPseudoToolTimer = null;
+}
+function handleLeakedToolCode(text) {
+  // Never eval model-generated tool_code. Only dispatch the two known
+  // read-only tools, with the last actual user question as input.
+  const match = String(text || "").match(/^\s*tool_code\s*[\r\n]+[\s\S]{0,160}?default_api\.(gmail_read|jobtread_read)\s*\(/i);
+  if (!match) return false;
+  clearTimeout(agentPseudoToolTimer);
+  stateEl.textContent = "Consultando " + (match[1] === "gmail_read" ? "Gmail" : "JobTread");
+  const question = String(agentLastQuestion || "").trim();
+  if (!question) return true;
+  const generation = agentToolCount;
+  agentPseudoToolTimer = setTimeout(() => {
+    agentPseudoToolTimer = null;
+    if (!agentClient?.connected || agentToolCount !== generation) return;
+    const reader = match[1] === "gmail_read" ? agentGmailRead : agentJobTreadRead;
+    reader({ question }).catch(e => { stateEl.textContent = "Consulta no disponible: " + String(e.message || e).slice(0, 100); });
+  }, 950);
+  return true;
+}
 function narrateVerifiedResult(out, source) {
   const observed = agentResponseSequence, readId = ++agentPendingRead;
   setTimeout(() => {
@@ -768,6 +792,7 @@ function agentErrorMessage(e) {
     : "No pude iniciar ElevenAgents: " + msg.slice(0, 180);
 }
 async function agentJobTreadRead({ question } = {}) {
+  noteRealToolCall();
   const q = String(question || agentLastQuestion || "Muéstrame mis proyectos de JobTread").trim().slice(0, 500);
   if (demo && /[?&]demo\b/.test(location.search)) {
     return { ok: false, speech: "Estás en modo DEMO explícito. Abre Jarvis sin ?demo=1 para consultas privadas." };
@@ -800,6 +825,7 @@ async function agentJobTreadRead({ question } = {}) {
 /* Gmail only returns sender, subject and short snippet after explicit Google OAuth.
    The access token NEVER leaves this browser for ElevenLabs. */
 async function agentGmailRead({ question } = {}) {
+  noteRealToolCall();
   const q = String(question || agentLastQuestion || "¿Cuáles son mis últimos correos?").slice(0, 500);
   if (!gmailClient?.connected) {
     const out = {
@@ -870,6 +896,7 @@ async function startAgentVoice(optionalQuestion = "") {
         if (!m?.text) return;
         if (m.speaker === "user") { agentLastQuestion = m.text; heardEl.textContent = m.text; }
         else if (m.speaker === "agent") {
+          if (handleLeakedToolCode(m.text)) return;
           agentResponseSequence++;
           heardEl.textContent = m.text;
           if (!reel.hidden) return;
@@ -889,6 +916,7 @@ async function startAgentVoice(optionalQuestion = "") {
 }
 async function stopAgentVoice() {
   agentPendingRead++;
+  clearTimeout(agentPseudoToolTimer); agentPseudoToolTimer = null;
   try { await agentClient?.stop(); } catch (e) { console.warn("ElevenAgents:", e.message); }
   talking = false; document.body.classList.remove("talking"); setPhase("idle"); renderConns();
 }
