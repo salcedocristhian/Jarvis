@@ -174,7 +174,7 @@ async function say(text) {
   setPhase("speaking");
   speakTick = setInterval(() => { energyTarget = .5 + Math.random() * .5; }, 110);
   try {
-    if (prefs.voice === "eleven" && status.elevenlabs === "connected" && !demo) {
+    if (prefs.voice === "eleven" && status.elevenlabs === "connected") {
       const blob = await api("/api/tts", { text: plain });
       const url = URL.createObjectURL(blob);
       await new Promise(res => {
@@ -192,7 +192,7 @@ async function say(text) {
         const next = () => {
           if (stopped || i >= parts.length) return res();
           const u = new SpeechSynthesisUtterance(parts[i++].trim());
-          if (voice) u.voice = voice; u.lang = voice?.lang || prefs.lang; u.rate = 1.04;
+          if (voice) u.voice = voice; u.lang = voice?.lang || prefs.lang; u.rate = 0.97;
           let done = false; const go = () => { if (!done) { done = true; clearTimeout(g); next(); } };
           const g = setTimeout(go, 2500 + u.text.length * 95);
           u.onend = go; u.onerror = go; synth.speak(u);
@@ -288,6 +288,17 @@ function frameHTML(f) {
       const v = Number(f.value) || 0, s = f.format === "usd" ? money(v) : Math.round(v).toLocaleString("en-US");
       return `<div class="frame f-number">${odometer(s)}<p>${esc(f.label || "")}</p></div>`;
     }
+
+    case "insight": {
+      const safe = typeof f.link === "string" && /^https:\/\/github\.com\/salcedocristhian\/[\w.-]+/.test(f.link) ? f.link : "";
+      return '<div class="frame f-insight"><article class="insight-card"><small class="insight-tag">'+esc(f.tag || "FUENTE GITHUB")+'</small><p class="insight-title">'+esc(f.title||"")+'</p><strong class="insight-value">'+esc(f.value||"")+'</strong><p class="insight-note">'+esc(f.note||"")+'</p>'+(safe?'<a class="source-link" href="'+esc(safe)+'" target="_blank" rel="noopener noreferrer">Ver fuente original ↗</a>':"")+'</article></div>';
+    }
+    case "source": {
+      const safe = typeof f.link === "string" && /^https:\/\/github\.com\/salcedocristhian\/[\w.-]+/.test(f.link) ? f.link : "";
+      return '<div class="frame f-insight"><article class="insight-card"><small class="insight-tag">DOCUMENTO ORIGINAL</small><p class="insight-title">'+esc(f.title||"")+'</p><p class="insight-note">'+esc(f.note||"")+'</p>'+(safe?'<a class="source-link" href="'+esc(safe)+'" target="_blank" rel="noopener noreferrer">Abrir GitHub ↗</a>':"")+'</article></div>';
+    }
+    case "capability":
+      return '<div class="frame f-insight"><article class="insight-card future-card"><small class="insight-tag">'+esc(f.tag||"VISIÓN FUTURA · NO CONECTADA")+'</small><p class="insight-title">'+esc(f.title||"")+'</p><p class="insight-note">'+esc(f.note||"")+'</p></article></div>';
     case "evidence":
       return `<div class="frame f-evidence"><div class="card"><b>${esc(f.title)}</b>${f.detail ? `<p>${esc(f.detail)}</p>` : ""}<small>${esc(f.source || "")}</small></div></div>`;
     case "action":
@@ -321,6 +332,7 @@ function showReel(out) {
   const step = k => { go(k); if (auto && k < reelFrames.length - 1) reelTimer = setTimeout(() => step(k + 1), per); };
   requestAnimationFrame(() => step(0));
   framesEl.onclick = e => {
+    if (e.target.closest("a,button")) return;
     auto = false; clearTimeout(reelTimer);
     const r = framesEl.getBoundingClientRect();
     go(reelIdx + (e.clientX > r.left + r.width / 2 ? 1 : -1));
@@ -386,7 +398,7 @@ $("#menuBtn").addEventListener("click", () => openSheet("menu"));
 $("#setBtn").addEventListener("click", () => openSheet("settings"));
 document.querySelectorAll("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
 function renderProjects() {
-  $("#projList").innerHTML = projects.length ? projects.map(p => `<button type="button" data-id="${esc(p.id)}"><span><b>${esc(p.label)}</b><small>${p.error ? esc(p.error) : `${esc(p.number || "")} · ${p.openTasks ?? 0} tareas abiertas · ${p.pendingDocs ?? 0} documentos pendientes`}</small></span><i class="dot ${p.urgent ? "hot" : ""}"></i></button>`).join("")
+  $("#projList").innerHTML = projects.length ? projects.map(p => `<button type="button" data-id="${esc(p.id)}"><span><b>${esc(p.label)}</b><small>${p.error ? esc(p.error) : (p.demoDetail ? esc(p.demoDetail) : `${esc(p.number || "")} · ${p.openTasks ?? 0} tareas abiertas · ${p.pendingDocs ?? 0} documentos pendientes`)}</small></span><i class="dot ${p.urgent ? "hot" : ""}"></i></button>`).join("")
     : `<p class="muted small">Agrega PINNED_JOBS en tu .env para ver tus proyectos aquí y como satélites del orbe.</p>`;
 }
 $("#projList").addEventListener("click", e => { const b = e.target.closest("[data-id]"); if (!b) return; $("#menu").close(); askAbout(projects.find(p => p.id === b.dataset.id)); });
@@ -403,23 +415,114 @@ function renderConns() {
 const bind = (id, key, after) => { const el = $(id); el.value = prefs[key]; el.addEventListener("change", () => { prefs[key] = el.value; store.set(key, el.value); after?.(); }); };
 bind("#optVoice", "voice"); bind("#optLang", "lang", () => setPhase(phase)); bind("#optMotion", "motion"); bind("#optPass", "pass", boot);
 
-/* ---------------- modo demo (sin llaves) ---------------- */
+/* --- DEMO REAL: READ-ONLY GITHUB DATA. No secret keys or invented financial data. --- */
 const DEMO_PROJECTS = [
-  { id: "demo-a", label: "Proyecto demo A", number: "DEMO-001", openTasks: 7, pendingDocs: 2, urgent: true },
-  { id: "demo-b", label: "Proyecto demo B", number: "DEMO-002", openTasks: 3, pendingDocs: 0, urgent: false },
+  {
+    "id": "repo-5660",
+    "label": "5660 Collins",
+    "number": "GitHub · Permits",
+    "demoDetail": "Permisos · Schedule · Planos",
+    "urgent": false
+  },
+  {
+    "id": "repo-barcelona",
+    "label": "Barcelona Gardens",
+    "number": "GitHub · Restoration",
+    "demoDetail": "Elevaciones · Repairs · Fotos",
+    "urgent": false
+  },
+  {
+    "id": "repo-gorilla",
+    "label": "Gorilla Screens",
+    "number": "GitHub · V17 Beta",
+    "demoDetail": "Enclosures · 3D · Takeoff",
+    "urgent": false
+  },
+  {
+    "id": "repo-kingfisher",
+    "label": "19984 Kingfisher",
+    "number": "GitHub · Studio 2.2",
+    "demoDetail": "3D · Diseño · Build",
+    "urgent": false
+  },
+  {
+    "id": "repo-ocean",
+    "label": "Ocean Park Manor",
+    "number": "Pendiente",
+    "demoDetail": "Repositorio no localizado",
+    "urgent": false
+  }
 ];
+async function demoRead(repo, file, asJSON=false) {
+  const allowed={"5660-collins-app":["data/permits.json"],"Barcelona":["README.md"],"Gorilla-Screens":["README.md"],"19984-Kingfisher-Lane-App":["README.md"]};
+  if (!(allowed[repo]||[]).includes(file)) return null;
+  try {
+    const r=await fetch("https://raw.githubusercontent.com/salcedocristhian/"+repo+"/main/"+file,{cache:"no-store"});
+    if (!r.ok) return null;
+    return asJSON?await r.json():await r.text();
+  } catch {return null;}
+}
 async function demoAnswer(q) {
-  await new Promise(r => setTimeout(r, 1400));
-  return {
-    speech: "Esto es una demostración. En el proyecto demo A hay dos documentos pendientes y unos cuatro mil setecientos dólares por pagar. Lo primero sería revisar la orden de cambio.",
-    frames: [
-      { type: "headline", text: "Demo A necesita una firma." },
-      { type: "number", value: 4735.69, format: "usd", label: "por pagar a un subcontratista (dato DEMO)" },
-      { type: "evidence", title: "Orden de cambio DEMO-001-41", detail: "Pendiente desde hace 3 días", source: "Datos de demostración" },
-      { type: "action", text: "Revisar y aprobar la orden de cambio." },
-    ],
-    closer: "Los números de demo no pagan cuentas.",
-  };
+  const z=String(q||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+  const base="https://github.com/salcedocristhian/";
+  const source=(title,note,link)=>({type:"source",title,note,link});
+  const info=(title,value,note,link,tag="FUENTE GITHUB")=>({type:"insight",title,value,note,link,tag});
+  const future=(title,note)=>({type:"capability",title,note,tag:"CAPACIDAD FUTURA · NO CONECTADA"});
+  const to=(speech,frames,project=null)=>({speech,frames,project,closer:"Fuentes primero. Decisiones después.",sources:["GitHub"]});
+  if (/5660|collins|permiso|pasillo|garaje|garage|fire watch/.test(z)) {
+    const d=await demoRead("5660-collins-app","data/permits.json",true);
+    const a=d?.items?.find(x=>x.id==="corridor");
+    const g=d?.items?.find(x=>x.id==="garage");
+    const fresh=d?.updatedAt ? "Actualizado en archivo: "+d.updatedAt : "Snapshot de referencia: 2026-11-07 · no leído en vivo";
+    const link=base+"5660-collins-app/blob/main/data/permits.json";
+    return to(
+      "En el registro del proyecto 5660, el permiso de pasillos figura emitido el 6 de noviembre. El garaje sigue en coordinación administrativa. Esta información viene del repositorio, no de una consulta en vivo a la ciudad.",
+      [{type:"headline",text:"5660 Collins. Expediente verificable."},
+       info("Remediación de pasillos","BC2628687",a?.status||"Emitido el 6 de noviembre de 2026",link,"REGISTRO DE PERMISOS"),
+       info("Garaje / Stormwater","BC2526722",g?.status||"Scope revisado · aprobación no confirmada",link),
+       info("Próximo control","17 NOV · 9:00 AM","Audiencia de iluminación. Confirmar comparecencia; 26 nov., seguimiento administrativo del garaje.",link,"FECHAS POR RECONFIRMAR"),
+       source("Abrir registro original",fresh,link)],"repo-5660");
+  }
+  if (/barcelona|balcon|elevacion|repair|reparacion|nv5|companycam/.test(z)) {
+    const readme=await demoRead("Barcelona","README.md");
+    const link=base+"Barcelona/blob/main/README.md";
+    const found=!!readme;
+    return to("Barcelona Gardens ya contiene datos de reparaciones, elevaciones y fotografías. El registro del Building 100 identifica cuarenta y nueve fotografías y treinta y tres reparaciones posicionadas aproximadamente. Puedo enseñarte de dónde sale cada dato.",
+      [{type:"headline",text:"Barcelona Gardens. Evidencia de campo."},
+       info("Building 100","49 FOTOS","Elevaciones CompanyCam · 11 nov. 2026",link,"INVENTARIO DEL REPO"),
+       info("Reparaciones en elevaciones","33","Ubicaciones aproximadas, no levantamiento certificado",link),
+       info("Balcones","35 FOTOS","Log de balcones · 20–21 oct. 2026",link),
+       source("Abrir Barcelona",found?"README leído de GitHub en esta consulta":"Snapshot del README verificado anteriormente · conexión temporalmente no disponible",link)],"repo-barcelona");
+  }
+  if (/gorilla|screen|enclosure|estructura|perfil|cotizacion|takeoff/.test(z)) {
+    const readme=await demoRead("Gorilla-Screens","README.md"),link=base+"Gorilla-Screens";
+    return to("Gorilla Screens tiene un Studio V17 beta para modelos conceptuales, perfiles, takeoff y planos preliminares. La visión automática desde fotografías sigue en desarrollo y requiere verificación humana.",
+      [{type:"headline",text:"Gorilla Screens. Del campo al 3D."},
+       info("Studio","V17 BETA","Modelo conceptual 3D, materiales y takeoff",link),
+       info("Entregables","11 × 17","Láminas preliminares y RFQ con revisión humana",link),
+       future("AI Vision","Una captura de fotos podría alimentar el análisis, pero el puente de IA requiere despliegue y no reemplaza medidas verificadas."),
+       source("Abrir Gorilla Screens",readme?"README consultado":"Resumen del README almacenado como referencia; lectura en vivo no disponible",link)],"repo-gorilla");
+  }
+  if (/king|19984|fisher|casa|interior|build/.test(z)) {
+    const readme=await demoRead("19984-Kingfisher-Lane-App","README.md"),link=base+"19984-Kingfisher-Lane-App";
+    return to("El repositorio de Kingfisher incluye una experiencia móvil con modelo 3D, materiales, vistas y secuencia de construcción. Jarvis puede usarlo como demostración visual sin cambiar los diseños.",
+      [{type:"headline",text:"Kingfisher. Un proyecto que se recorre."},
+       info("Studio","2.2","Navegación Home, Design, Build y Saved",link),
+       info("Recorrido","3D","Vistas de exteriores, interiores y materiales",link),
+       source("Abrir código original",readme?"README consultado":"Referencia documentada en README; lectura no disponible",link)],"repo-kingfisher");
+  }
+  if (/ocean|park|manor/.test(z)) {
+    return {speech:"Ocean Park Manor está contemplado en el diseño, pero no encontré un repositorio autorizado para sus documentos. No mostraré planos ni datos inventados.",frames:[{type:"headline",text:"Ocean Park Manor. Sin conectar."},future("Conectar proyecto","Al obtener acceso a sus archivos, Jarvis podrá mostrar evidencia técnica, PDFs y cronogramas sin crear datos ficticios.")],project:"repo-ocean",closer:"Lo que no está verificado, no se presenta como hecho.",sources:[]};
+  }
+  if (/correo|outlook|email|calendario|adjunto|pdf|crear|publicar|github|conexi|voz|voice|eleven/.test(z)) {
+    return {speech:"Te muestro una capacidad futura. Con Outlook, JobTread, ElevenLabs y un servidor seguro, podré investigar un correo y sus adjuntos, visualizar hallazgos como tarjetas y preparar un documento. No enviaré ni publicaré nada sin tu aprobación.",frames:[{type:"headline",text:"De correo a decisión. Una sola conversación."},future("Outlook y archivos","El correo aparece como tarjeta, y un PDF se transforma en evidencias y tareas con fuentes."),future("ElevenLabs","La voz premium puede narrar cualquier respuesta cuando esté configurada la API y la voz correspondiente."),future("Aprobaciones","Vista previa del email o del cambio en GitHub, seguida de aprobación explícita." )],closer:"Las conexiones no se simulan como activas.",sources:[]};
+  }
+  return to("Esta demo usa registros públicos verificables de tus proyectos. Prueba preguntarme por 5660 Collins, las elevaciones de Barcelona, Gorilla Screens o Kingfisher. También puedo explicarte cómo serán las conexiones futuras.",
+    [{type:"headline",text:"Tus proyectos. Una interfaz viva."},
+     info("5660 Collins","BC2628687","Permiso de pasillos documentado como emitido",base+"5660-collins-app"),
+     info("Barcelona Gardens","49 FOTOS","Elevaciones Building 100 del inventario",base+"Barcelona"),
+     info("Gorilla Screens","V17 BETA","Diseño 3D, takeoff y entrega preliminar",base+"Gorilla-Screens"),
+     future("Próxima etapa","Outlook, JobTread, CompanyCam, PDFs y acciones seguras coordinadas desde un solo orbe.")]);
 }
 
 /* ---------------- arranque ---------------- */
