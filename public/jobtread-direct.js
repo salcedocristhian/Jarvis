@@ -118,7 +118,7 @@
         sources: [], project: null, closer: "Solo lectura." };
     }
     const docRequest = /document|factura|invoice|orden(?:es)?|aprobaci|bill|submittal|propuesta|proposal/i.test(q);
-    const dailyRequest = /daily.?log|diario.?de.?obra|bitacora|registro.?diario|reporte.?diario/i.test(q);
+    const dailyRequest = /daily.?logs?|diarios?.?de.?obra|bitacora|registros?.?diarios?|reportes?.?diarios?/i.test(q);
     const filesRequest = /archivo|files|foto|photograph|adjunto|planos|plan/i.test(q);
     const pendingOnly = /pendient|pending|draft|borrador|sin terminar|abiert|open|incomplet/i.test(q);
     const taskRequest = !docRequest && !dailyRequest && !filesRequest && /tarea|pendient(?:e|es)|por vencer|vencid|to.?do|actividades|task|schedule|cronograma/i.test(q);
