@@ -219,14 +219,14 @@ window.UNA_CONFIG = {
     <select id="optMotion"><option value="full">Completo</option><option value="calm">Calmado</option></select>
   </label>
   <h2>Conexiones.</h2>
-  <p class="muted small">Se guardan solo en este teléfono. Nunca van a GitHub.</p>
+  <p class="muted small">La voz ElevenAgents funciona sin llave. Para ver datos privados de JobTread, debes autorizar esta sesión en cada navegador (Grant Key).</p>
   <div class="keys">
     <label class="opt col">Llave de Claude<input id="kClaude" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
     <label class="opt col">Modelo<input id="kModel" autocomplete="off"></label>
     <label class="opt col">Grant key de JobTread<input id="kJob" type="password" autocomplete="off"></label>
     <label class="opt col">Proyectos fijos<input id="kPins" autocomplete="off" placeholder="id|Nombre,id|Nombre"></label>
-    <label class="opt col">Llave de ElevenLabs (opcional)<input id="kEleven" type="password" autocomplete="off"></label>
-    <label class="opt col">Voice ID de ElevenLabs<input id="kVoice" autocomplete="off"></label>
+    <label class="opt col">Llave de ElevenLabs TTS (opcional; no necesaria con ElevenAgents)<input id="kEleven" type="password" autocomplete="off"></label>
+    <label class="opt col">Voice ID para TTS manual (opcional)<input id="kVoice" autocomplete="off"></label>
   </div>
   <div class="btnrow"><button class="btn primary" type="button" id="testBtn">Probar conexiones</button><button class="btn ghost" type="button" id="forget">Borrar llaves</button></div>
   <ul class="conns" id="testOut"></ul>
@@ -683,7 +683,7 @@ function frameHTML(f) {
     case "action":
       return `<div class="frame f-action"><div class="mark"></div><h3>${esc(f.text)}</h3></div>`;
     default:
-      return `<div class="frame f-headline"><h3>${esc(f.text || "").split(" ").map((w, i) => `<span class="w" style="transition-delay:${i * 70}ms">${w}</span>`).join(" ")}</h3></div>`;
+      return `<div class="frame f-headline"><h3>${esc(f.text || "").split(" ").map((w, i) => `<span class="w" style="transition-delay:${i * 70}ms">${esc(w)}</span>`).join(" ")}</h3></div>`;
   }
 }
 function go(i) {
@@ -1008,7 +1008,7 @@ async function boot() {
   catch (e) { projects = []; stateEl.textContent = "JobTread: " + e.message; }
   if (!demo && keys.jobtread && !keys.claude && projects.length) stateEl.textContent = "JobTread listo · pregunta por tus proyectos";
   renderProjects();
-  if (demo && !keys.jobtread && !store.get("seenSetup", "")) { store.set("seenSetup", "1"); stateEl.textContent = "Modo demo · conecta JobTread o Claude"; }
+  if (demo && !keys.jobtread) stateEl.textContent = "Voz ElevenAgents disponible · JobTread requiere Grant Key en este navegador";
 }
 setPhase("idle"); renderHistory(); boot();
 })();
