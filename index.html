@@ -1000,6 +1000,7 @@ async function demoAnswer(q) {
 
 /* ---------------- arranque ---------------- */
 async function boot() {
+  if (prefs.voice === "eleven" && !keys.eleven) { prefs.voice = "agent"; store.set("voice", "agent"); $("#optVoice").value = "agent"; }
   demo = /[?&]demo\b/.test(location.search) || (!keys.claude && !keys.jobtread);
   status = { agent: "ready", claude: keys.claude ? "connected" : "not_connected", jobtread: keys.jobtread ? "connected" : "not_connected", elevenlabs: keys.eleven && keys.voiceId ? "connected" : "not_connected", outlook: "not_connected" };
   $("#demoTag").hidden = !demo;
