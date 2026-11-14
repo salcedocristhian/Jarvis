@@ -189,7 +189,7 @@ window.UNA_CONFIG = {
   <button class="tiny" id="menuBtn" type="button" aria-label="Menú" aria-haspopup="dialog">
     <svg viewBox="0 0 24 24"><path d="M5 9h14M5 15h9"/></svg>
   </button>
-  <span class="demo" id="demoTag" hidden>DEMO</span>
+  <span class="demo sr" id="demoTag" hidden>DEMO</span>
   <button class="tiny" id="setBtn" type="button" aria-label="Ajustes" aria-haspopup="dialog">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8" stroke-dasharray="2.2 3.1"/></svg>
   </button>
@@ -200,9 +200,9 @@ window.UNA_CONFIG = {
   <button class="orb" id="orb" type="button" aria-label="Hablar con Una">
     <canvas id="orbCanvas" aria-hidden="true"></canvas>
   </button>
-  <p class="state" id="state" role="status">Toca para hablar</p>
-  <p class="heard" id="heard" aria-live="polite"></p>
-  <div class="handsfree-panel" id="handsfreePanel">
+  <p class="state sr" id="state" role="status">Toca para hablar</p>
+  <p class="heard sr" id="heard" aria-live="polite"></p>
+  <div class="handsfree-panel" id="handsfreePanel" hidden>
     <button type="button" class="handsfree-toggle" id="handsfreeToggle" aria-pressed="false" data-active="false">
       <span class="handsfree-dot" aria-hidden="true"></span><span id="handsfreeLabel">Activar manos libres</span>
     </button>
@@ -282,7 +282,7 @@ window.UNA_CONFIG = {
   <p class="muted small">En <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noopener noreferrer">Google Cloud · Clients</a>, registra el origen <b>https://salcedocristhian.github.io</b> para un cliente OAuth de tipo Web. Configura la pantalla de consentimiento y tu usuario de prueba si corresponde.</p>
   <div class="btnrow"><button class="btn primary" type="button" id="testBtn">Probar conexiones</button><button class="btn ghost" type="button" id="forget">Borrar llaves</button></div>
   <ul class="conns" id="testOut"></ul>
-  <p class="muted small">Mantén presionado el orbe para escribir. Desliza hacia abajo para despejar la pantalla.</p>
+  <p class="muted small">Toca el orbe una vez para iniciar o detener la conversación continua. Mantén presionado para escribir. Desliza hacia abajo para despejar la pantalla.</p>
 </dialog>
 
 <script src="./public/jobtread-direct.js"></script>
@@ -1341,7 +1341,9 @@ async function boot() {
   renderProjects();
   if (demo && !keys.jobtread) stateEl.textContent = "Voz ElevenAgents disponible · JobTread requiere Grant Key en este navegador";
 }
-setPhase("idle"); renderHandsfree(); renderHistory(); showGmailWelcomeOnLaunch(); boot();
+setPhase("idle"); renderHandsfree(); renderHistory(); // Preload the ElevenAgents JavaScript in the background: no microphone or conversation starts here.
+agentClient?.preload?.().catch(() => {});
+showGmailWelcomeOnLaunch(); boot();
 })();
 
 </script>
