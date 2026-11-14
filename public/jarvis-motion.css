@@ -124,3 +124,25 @@
  .motion-envelope-flap{transform:rotateX(153deg)!important}
  .motion-envelope-paper{transform:translateY(-23%)!important}
 }
+
+/* Respect the in-app Calmado option as well as the iOS reduced-motion setting. */
+html[data-motion="calm"] .motion-shell,
+html[data-motion="calm"] .motion-shell:after,
+html[data-motion="calm"] .motion-sweep,
+html[data-motion="calm"] .motion-orbit,
+html[data-motion="calm"] .motion-mail-ghost,
+html[data-motion="calm"] .motion-envelope,
+html[data-motion="calm"] .motion-envelope-flap,
+html[data-motion="calm"] .motion-envelope-paper,
+html[data-motion="calm"] .motion-envelope-light,
+html[data-motion="calm"] .motion-mail-preview,
+html[data-motion="calm"] .motion-holo-floor,
+html[data-motion="calm"] .motion-building,
+html[data-motion="calm"] .motion-holo-laser,
+html[data-motion="calm"] .motion-data-mark,
+html[data-motion="calm"] .motion-budget-hub-ring,
+html[data-motion="calm"] .motion-budget-line,
+html[data-motion="calm"] .motion-budget-value
+{animation:none!important;transition:none!important;transform:none!important;filter:none!important}
+html[data-motion="calm"] .motion-envelope-flap{transform:rotateX(153deg)!important}
+html[data-motion="calm"] .motion-envelope-paper{transform:translateY(-23%)!important}
