@@ -21,7 +21,7 @@ const ctx = {
       callback=config.callback;
       return {requestAccessToken(options) {
         oauthCalls++;
-        assert.equal(options.prompt,"consent");
+        assert.equal(options.prompt,"");
         callback({access_token:"TEST_TOKEN_NOT_REAL",expires_in:3600});
       }};
     },
