@@ -7,7 +7,11 @@ const matching=[{id:"target",name:"5660 Collins Avenue",number:"MTD-5660",status
 const calls=[];
 const q=async query=>{
   const jobs=query?.organization?.jobs;
-  if(!jobs)throw Error("Only organization.jobs is allowed here");
+  if(!jobs && query.job?.tasks && query.job?.documents && query.job?.dailyLogs) {
+    return {job:{name:"5660 Collins Avenue",number:"MTD-5660",description:"Project overview",
+      createdAt:"2026-11-10",closedOn:null,tasks:{count:2},documents:{count:3},dailyLogs:{count:1}}};
+  }
+  if(!jobs)throw Error("Only read-only organization.jobs or job overview allowed here");
   calls.push(jobs.$);
   if(jobs.$.where){const term=jobs.$.where[2];return {organization:{jobs:{
     count:1,nodes:term.includes("5660")?matching:[]
