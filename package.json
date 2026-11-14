@@ -11,6 +11,6 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "check": "node --check server.js && node --check public/app.js && node --check public/config.js",
-    "test": "node test/smoke.mjs && node test/jobtread-direct.mjs && node test/server-direct.mjs"
+    "test": "node test/smoke.mjs && node test/jobtread-direct.mjs && node test/server-direct.mjs && node test/elevenagents.mjs"
   }
 }
