@@ -49,6 +49,21 @@ main{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;
 .state{margin:14px 0 0;font-size:13px;letter-spacing:.04em;color:var(--sky);min-height:1.2em;transition:opacity .4s}
 .heard{margin:8px 0 0;max-width:34ch;text-align:center;font-style:italic;color:var(--muted);font-size:15px;line-height:1.4;min-height:1.4em}
 
+
+/* Foreground-only, explicitly opted-in continuous conversation. */
+.handsfree-panel{display:flex;flex-direction:column;align-items:center;gap:7px;margin-top:12px;max-width:min(90vw,420px);z-index:2}
+.handsfree-toggle{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;padding:10px 18px;border:1px solid var(--line);background:rgba(10,26,48,.72);color:var(--paper);border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;letter-spacing:.01em;transition:border-color .25s,background .25s,box-shadow .25s}
+.handsfree-toggle:focus-visible{outline:2px solid var(--sky);outline-offset:3px}
+.handsfree-toggle:disabled{opacity:.6;cursor:wait}
+.handsfree-toggle[data-active="true"]{border-color:#85C9EA;background:rgba(37,99,141,.25);box-shadow:0 0 16px rgba(99,180,224,.15)}
+.handsfree-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.handsfree-toggle[data-active="true"] .handsfree-dot{background:#70D6AE;box-shadow:0 0 0 4px rgba(112,214,174,.1);animation:mic-pulse 1.8s ease-in-out infinite}
+.handsfree-hint{font-size:11px;line-height:1.35;color:var(--muted);text-align:center;max-width:38ch}
+@keyframes mic-pulse{50%{box-shadow:0 0 0 7px rgba(112,214,174,.02)}}
+@media(prefers-reduced-motion:reduce){.handsfree-toggle[data-active="true"] .handsfree-dot{animation:none}}
+body.docked .handsfree-panel{margin-top:6px}
+body.docked .handsfree-hint{display:none}
+
 /* docked: orb steps back, the answer takes the floor */
 body.docked main{justify-content:flex-start}
 body.docked .orb{width:min(30vw,132px)}
@@ -181,6 +196,12 @@ window.UNA_CONFIG = {
   </button>
   <p class="state" id="state" role="status">Toca para hablar</p>
   <p class="heard" id="heard" aria-live="polite"></p>
+  <div class="handsfree-panel" id="handsfreePanel">
+    <button type="button" class="handsfree-toggle" id="handsfreeToggle" aria-pressed="false" data-active="false">
+      <span class="handsfree-dot" aria-hidden="true"></span><span id="handsfreeLabel">Activar manos libres</span>
+    </button>
+    <span id="handsfreeHint" class="handsfree-hint" aria-live="polite">Escucha continua mientras Jarvis está abierto. Se pausa si sales de la página.</span>
+  </div>
   </div>
 
   <section class="reel" id="reel" aria-live="polite" aria-label="Respuesta" hidden>
@@ -750,6 +771,53 @@ function clearReel() {
    The JobTread Grant Key, when present, remains on this device. */
 const agentClient = window.JarvisElevenAgent;
 const gmailClient = window.JarvisGmail;
+let handsfreePreferred = store.get("handsfreeEnabled", "0") === "1";
+let handsfreeSessionStarted = false;
+const handsfreeToggle = $("#handsfreeToggle");
+const handsfreeLabel = $("#handsfreeLabel"), handsfreeHint = $("#handsfreeHint");
+function renderHandsfree() {
+  const active = Boolean(handsfreeSessionStarted || agentClient?.connected);
+  const pending = Boolean(agentClient?.connecting);
+  handsfreeToggle.dataset.active = String(active);
+  handsfreeToggle.setAttribute("aria-pressed", String(active));
+  handsfreeToggle.disabled = pending;
+  handsfreeLabel.textContent = active ? "Detener escucha" : pending ? "Conectando micrófono…" :
+    handsfreePreferred ? "Reanudar escucha" : "Activar manos libres";
+  handsfreeHint.textContent = active
+    ? "Micrófono activo · di tu pregunta sin tocar el orbe. Pulsa Detener para terminar."
+    : handsfreePreferred
+      ? "En pausa. Toca Reanudar para permitir la escucha en esta sesión."
+      : "Escucha continua con pantalla activa. No funciona con el iPhone bloqueado.";
+}
+async function toggleHandsfree() {
+  if (agentClient?.connected || handsfreeSessionStarted) {
+    handsfreePreferred = false;
+    store.set("handsfreeEnabled", "0");
+    await stopAgentVoice();
+  } else {
+    handsfreePreferred = true;
+    store.set("handsfreeEnabled", "1");
+    if (prefs.voice !== "agent") {
+      prefs.voice = "agent";
+      store.set("voice", "agent");
+      $("#optVoice").value = "agent";
+    }
+    renderHandsfree();
+    await startAgentVoice();
+  }
+  renderHandsfree();
+}
+handsfreeToggle.addEventListener("click", toggleHandsfree);
+document.addEventListener("visibilitychange", () => {
+  // iOS browsers cannot reliably capture audio after backgrounding or lock.
+  // Do not attempt an invisible restart: require a fresh gesture on return.
+  if (document.hidden && (agentClient?.connected || handsfreeSessionStarted)) {
+    stopAgentVoice();
+  } else if (!document.hidden && handsfreePreferred && !agentClient?.connected) {
+    setPhase("idle", "Escucha pausada · pulsa Reanudar");
+    renderHandsfree();
+  }
+});
 const useAgentVoice = () => prefs.voice === "agent" || (prefs.voice === "eleven" && !keys.eleven);
 let agentLastQuestion = "";
 let agentResponseSequence = 0, agentPendingRead = 0;
@@ -885,12 +953,21 @@ async function startAgentVoice(optionalQuestion = "") {
   try {
     const session = await agentClient.start({
       clientTools: { jobtread_read: agentJobTreadRead, gmail_read: agentGmailRead },
-      onConnect: () => { talking = true; document.body.classList.add("talking"); setPhase("listening", "ElevenAgents conectado"); renderConns(); },
-      onDisconnect: () => { talking = false; document.body.classList.remove("talking"); setPhase("idle"); renderConns(); },
+      onConnect: () => {
+        talking = true; handsfreeSessionStarted = true;
+        document.body.classList.add("talking"); setPhase("listening", "Escuchando continuamente · micrófono activo");
+        renderHandsfree(); renderConns();
+      },
+      onDisconnect: () => {
+        talking = false; handsfreeSessionStarted = false;
+        document.body.classList.remove("talking");
+        setPhase("idle", handsfreePreferred ? "Escucha pausada · pulsa Reanudar" : "Toca para hablar");
+        renderHandsfree(); renderConns();
+      },
       onModeChange: m => {
         const mode = String(m?.mode || m || "");
-        if (mode === "speaking") setPhase("speaking");
-        else if (mode === "listening") setPhase("listening");
+        if (mode === "speaking") setPhase("speaking", "Jarvis respondiendo · micrófono activo");
+        else if (mode === "listening") setPhase("listening", "Escuchando continuamente · micrófono activo");
       },
       onMessage: m => {
         if (!m?.text) return;
@@ -905,6 +982,12 @@ async function startAgentVoice(optionalQuestion = "") {
       },
       onError: e => { stateEl.textContent = agentErrorMessage(e); },
     });
+    if (document.hidden && session) {
+      // A tab may become hidden while the asynchronous SDK initializes.
+      await stopAgentVoice();
+      return;
+    }
+    renderHandsfree();
     if (optionalQuestion && session) session.sendUserMessage(optionalQuestion);
   } catch (e) {
     talking = false; document.body.classList.remove("talking");
@@ -912,13 +995,18 @@ async function startAgentVoice(optionalQuestion = "") {
     showReel({ speech: msg, frames: [{ type: "headline", text: "Voz ElevenAgents no disponible." },
       { type: "evidence", title: msg, source: "Revisa conexión del navegador" }] });
     setPhase("idle", msg);
+    handsfreeSessionStarted = false;
+    renderHandsfree();
   }
 }
 async function stopAgentVoice() {
   agentPendingRead++;
   clearTimeout(agentPseudoToolTimer); agentPseudoToolTimer = null;
   try { await agentClient?.stop(); } catch (e) { console.warn("ElevenAgents:", e.message); }
-  talking = false; document.body.classList.remove("talking"); setPhase("idle"); renderConns();
+  talking = false; handsfreeSessionStarted = false;
+  document.body.classList.remove("talking");
+  setPhase("idle", handsfreePreferred ? "Escucha pausada · pulsa Reanudar" : "Toca para hablar");
+  renderConns(); renderHandsfree();
 }
 
 /* ---------------- gestos ---------------- */
@@ -931,7 +1019,15 @@ orb.addEventListener("click", e => {
   if (longPressed) return;
   const hit = sats.find(s => Math.hypot(s.x - e.clientX, s.y - e.clientY) < 24);
   if (hit) return askAbout(hit.p);
-  if (useAgentVoice()) { if (agentClient?.connected) return stopAgentVoice(); return startAgentVoice(); }
+  if (useAgentVoice()) {
+    if (agentClient?.connected) {
+      if (handsfreePreferred) {
+        handsfreePreferred = false; store.set("handsfreeEnabled", "0");
+      }
+      return stopAgentVoice();
+    }
+    return startAgentVoice();
+  }
   if (phase === "speaking") { stopSpeaking(); return; }       // tocar mientras habla = interrumpir
   if (talking) return endTalk();
   if (!reel.hidden) clearReel();
@@ -985,7 +1081,13 @@ function renderConns() {
   }).join("");
 }
 const bind = (id, key, after) => { const el = $(id); el.value = prefs[key]; el.addEventListener("change", () => { prefs[key] = el.value; store.set(key, el.value); after?.(); }); };
-bind("#optVoice", "voice", () => { if (agentClient?.connected) stopAgentVoice(); }); bind("#optLang", "lang", () => setPhase(phase)); bind("#optMotion", "motion");
+bind("#optVoice", "voice", () => {
+  if (prefs.voice !== "agent") {
+    handsfreePreferred = false; store.set("handsfreeEnabled", "0");
+  }
+  if (agentClient?.connected) stopAgentVoice();
+  renderHandsfree();
+}); bind("#optLang", "lang", () => setPhase(phase)); bind("#optMotion", "motion");
 [["#kClaude","k.claude"],["#kModel","k.model"],["#kJob","k.jobtread"],["#kPins","k.pinned"],["#kEleven","k.eleven"],["#kVoice","k.voiceId"]].forEach(([id,k]) => {
   const el = $(id); el.value = store.get(k, k === "k.model" ? "claude-sonnet-5-5" : "");
   el.addEventListener("change", () => { store.set(k, el.value.trim()); orgId = null; jtMode = "json"; });
@@ -1137,7 +1239,7 @@ async function boot() {
   renderProjects();
   if (demo && !keys.jobtread) stateEl.textContent = "Voz ElevenAgents disponible · JobTread requiere Grant Key en este navegador";
 }
-setPhase("idle"); renderHistory(); boot();
+setPhase("idle"); renderHandsfree(); renderHistory(); boot();
 })();
 
 </script>
