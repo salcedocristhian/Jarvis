@@ -8,7 +8,9 @@ assert.ok(root.includes('<script src="./public/eleven-agent-client.js"></script>
 assert.ok(root.includes('ElevenAgents · conversación (sin API Key)'));
 assert.ok(root.includes('clientTools: { jobtread_read: agentJobTreadRead, gmail_read: agentGmailRead }'));
 assert.ok(root.includes('if (useAgentVoice()) startAgentVoice(q); else turn(q);'));
-assert.ok(root.includes('if (useAgentVoice()) { if (agentClient?.connected) return stopAgentVoice(); return startAgentVoice(); }'));
+assert.ok(root.includes('if (useAgentVoice()) {'));
+assert.ok(root.includes('if (handsfreePreferred) {'));
+assert.ok(root.includes('return stopAgentVoice();'));
 assert.ok(root.includes('if (!keys.jobtread) {'));
 assert.ok(!src.includes("xi-api-key"));
 assert.ok(!src.includes("JOBTREAD_GRANT_KEY"));
