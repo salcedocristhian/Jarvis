@@ -282,6 +282,15 @@ window.UNA_CONFIG = {
   </div>
   <p class="muted small" id="gmailStatus">No conectado. Requiere OAuth Client ID web, Gmail API habilitada y autorización de Google. No guarda tokens entre sesiones.</p>
   <p class="muted small">En <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noopener noreferrer">Google Cloud · Clients</a>, registra el origen <b>https://salcedocristhian.github.io</b> para un cliente OAuth de tipo Web. Configura la pantalla de consentimiento y tu usuario de prueba si corresponde.</p>
+  <details id="webResearchSettings">
+    <summary>Internet con Gemini · configuración privada</summary>
+    <p class="muted small">Investigación pública con Google Search. La llave de Gemini se mantiene en Cloudflare, nunca aquí. El acceso de este teléfono solo permanece en memoria durante la pestaña abierta.</p>
+    <label class="opt col">Token de acceso privado al servicio de Jarvis
+      <input id="webResearchToken" type="password" autocomplete="off" placeholder="Acceso privado del Worker (no Gemini API key)">
+    </label>
+    <div class="btnrow"><button class="btn ghost" type="button" id="webResearchConnect">Activar investigación</button><button class="btn ghost" type="button" id="webResearchDisconnect">Desactivar</button></div>
+    <p class="muted small" id="webResearchStatus" role="status">Pendiente de configurar el servicio privado en Cloudflare.</p>
+  </details>
   <div class="btnrow"><button class="btn primary" type="button" id="testBtn">Probar conexiones</button><button class="btn ghost" type="button" id="forget">Borrar llaves</button></div>
   <ul class="conns" id="testOut"></ul>
   <p class="muted small">Toca el orbe una vez para iniciar o detener la conversación continua. Mantén presionado para escribir. Desliza hacia abajo para despejar la pantalla.</p>
@@ -291,6 +300,7 @@ window.UNA_CONFIG = {
 <script src="./public/eleven-agent-client.js"></script>
 <script src="https://accounts.google.com/gsi/client" id="google-identity-services" async defer></script>
 <script src="./public/gmail-readonly.js"></script>
+<script src="./public/web-research.js"></script>
 <script src="./public/jarvis-explorer.js"></script>
 <script src="./public/jarvis-motion.js"></script>
 <script>
@@ -477,6 +487,7 @@ async function testConnections() {
   const out = $("#testOut"); out.innerHTML = `<li><span class="muted">Probando…</span></li>`; out.scrollIntoView({ block: "end", behavior: "smooth" }); out.innerHTML = "";
   const row = (n, ok, msg) => out.insertAdjacentHTML("beforeend", `<li><span>${n}</span><span class="${ok ? "ok" : "no"}">${esc(msg)}</span></li>`);
   row("ElevenAgents", true, "Configurado sin API Key; toca el orbe para probar la voz");
+  row("Internet (Gemini)", Boolean(window.JarvisWebResearch?.configured), window.JarvisWebResearch?.configured ? "Acceso privado configurado (la búsqueda se verifica al usarla)" : "Por activar en Cloudflare y Ajustes");
   row("Gmail", Boolean(window.JarvisGmail?.connected), window.JarvisGmail?.connected ? "Autorizado por Google en esta sesión" : "Sin autorizar. Pulsa Conectar Gmail con Google");
   if (keys.claude) { try { await claudeCall({ model: keys.model, max_tokens: 5, messages: [{ role: "user", content: "di ok" }] }); row("Claude", true, "Funciona"); } catch (e) { row("Claude", false, e.message); } }
   else row("Claude", false, "Falta la llave");
@@ -753,6 +764,11 @@ function frameHTML(f) {
     }
     case "capability":
       return '<div class="frame f-insight"><article class="insight-card future-card"><small class="insight-tag">'+esc(f.tag||"VISIÓN FUTURA · NO CONECTADA")+'</small><p class="insight-title">'+esc(f.title||"")+'</p><p class="insight-note">'+esc(f.note||"")+'</p></article></div>';
+    case "web-source": {
+      let safe = "";
+      try { const u = new URL(f.link || ""); if (u.protocol === "https:" && !u.username && !u.password) safe = u.href; } catch (_) {}
+      return '<div class="frame f-insight"><article class="insight-card"><small class="insight-tag">FUENTE PÚBLICA · INTERNET</small><p class="insight-title">'+esc(f.title||"Fuente")+'</p>'+(safe?'<a class="source-link" href="'+esc(safe)+'" target="_blank" rel="noopener noreferrer">Consultar fuente ↗</a>':'')+'</article></div>';
+    }
     case "evidence":
       return `<div class="frame f-evidence"><div class="card"><b>${esc(f.title)}</b>${f.detail ? `<p>${esc(f.detail)}</p>` : ""}<small>${esc(f.source || "")}</small></div></div>`;
     case "action":
@@ -866,6 +882,7 @@ function clearReel() {
    The JobTread Grant Key, when present, remains on this device. */
 const agentClient = window.JarvisElevenAgent;
 const gmailClient = window.JarvisGmail;
+const webResearch = window.JarvisWebResearch;
 let handsfreePreferred = store.get("handsfreeEnabled", "0") === "1";
 let handsfreeSessionStarted = false;
 const handsfreeToggle = $("#handsfreeToggle");
@@ -925,17 +942,17 @@ function noteRealToolCall() {
 function handleLeakedToolCode(text) {
   // Never eval model-generated tool_code. Only dispatch the two known
   // read-only tools, with the last actual user question as input.
-  const match = String(text || "").match(/^\s*tool_code\s*[\r\n]+[\s\S]{0,160}?default_api\.(gmail_read|jobtread_read)\s*\(/i);
+  const match = String(text || "").match(/^\s*tool_code\s*[\r\n]+[\s\S]{0,160}?default_api\.(gmail_read|jobtread_read|web_research)\s*\(/i);
   if (!match) return false;
   clearTimeout(agentPseudoToolTimer);
-  stateEl.textContent = "Consultando " + (match[1] === "gmail_read" ? "Gmail" : "JobTread");
+  stateEl.textContent = "Consultando " + (match[1] === "gmail_read" ? "Gmail" : match[1] === "web_research" ? "Internet" : "JobTread");
   const question = String(agentLastQuestion || "").trim();
   if (!question) return true;
   const generation = agentToolCount;
   agentPseudoToolTimer = setTimeout(() => {
     agentPseudoToolTimer = null;
     if (!agentClient?.connected || agentToolCount !== generation) return;
-    const reader = match[1] === "gmail_read" ? agentGmailRead : agentJobTreadRead;
+    const reader = match[1] === "gmail_read" ? agentGmailRead : match[1] === "web_research" ? agentWebResearch : agentJobTreadRead;
     reader({ question }).catch(e => { stateEl.textContent = "Consulta no disponible: " + String(e.message || e).slice(0, 100); });
   }, 950);
   return true;
@@ -1051,6 +1068,21 @@ async function agentGmailRead({ question } = {}) {
   }
 }
 
+async function agentWebResearch({ question } = {}) {
+  noteRealToolCall();
+  const q = String(question || agentLastQuestion || "").trim().slice(0, 600);
+  setPhase("thinking", "Investigando fuentes públicas");
+  const result = await webResearch.search({ question: q });
+  const frames = [{ type: "headline", text: result.ok ? "Investigación web" : "Internet no disponible" }];
+  for (const source of result.sources || []) frames.push({ type: "web-source", title: source.title, link: source.url });
+  if (!result.grounded) frames.push({ type: "evidence", title: result.ok ? "Fuentes no verificadas" : "Consulta pendiente", detail: result.ok ? "La respuesta no incluye referencias verificadas de Google Search." : result.speech, source: "Gemini / Cloudflare" });
+  const out = { speech: result.speech, frames, closer: result.grounded ? "Fuentes públicas · Verifica antes de tomar decisiones." : "No confirmada con fuentes externas." };
+  showReel(out);
+  timeline.unshift({ q, a: result.speech }); renderHistory();
+  narrateVerifiedResult(out, "Internet");
+  return { ok: result.ok, speech: result.speech, grounded: result.grounded, sources: result.sources || [] };
+}
+
 async function startAgentVoice(optionalQuestion = "") {
   if (!agentClient) { setPhase("idle", "ElevenAgents no cargó."); return; }
   if (agentClient.connected) {
@@ -1064,7 +1096,7 @@ async function startAgentVoice(optionalQuestion = "") {
   agentLastQuestion = optionalQuestion;
   try {
     const session = await agentClient.start({
-      clientTools: { jobtread_read: agentJobTreadRead, gmail_read: agentGmailRead },
+      clientTools: { jobtread_read: agentJobTreadRead, gmail_read: agentGmailRead, web_research: agentWebResearch },
       onConnect: () => {
         talking = true; handsfreeSessionStarted = true;
         document.body.classList.add("talking"); setPhase("listening", "Escuchando continuamente · micrófono activo");
@@ -1242,6 +1274,19 @@ async function connectGmailFromButton() {
     renderConns();
   }
 }
+const webStatus = $("#webResearchStatus");
+$("#webResearchConnect").addEventListener("click", () => {
+  try {
+    webResearch.configure($("#webResearchToken").value);
+    $("#webResearchToken").value = "";
+    webStatus.textContent = webResearch.configured ? "Acceso configurado solo para esta pestaña. Haz una pregunta de actualidad al orbe." : "Acceso vacío; sigue desactivado.";
+  } catch (e) { webStatus.textContent = e.message; }
+});
+$("#webResearchDisconnect").addEventListener("click", () => {
+  webResearch.configure("");
+  $("#webResearchToken").value = "";
+  webStatus.textContent = "Investigación desactivada para esta pestaña.";
+});
 gmailSettingsConnect.addEventListener("click", connectGmailFromButton);
 gmailWelcomeConnect.addEventListener("click", connectGmailFromButton);
 $("#gmailWelcomeSkip").addEventListener("click", () => gmailWelcome.close());
