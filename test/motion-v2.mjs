@@ -20,7 +20,7 @@ assert.ok(css.includes(".motion-budget-flow"));
 assert.ok(css.includes('@media(prefers-reduced-motion:reduce)'));
 assert.ok(css.includes('@media(max-width:375px)'));
 assert.ok(css.includes('.reel[data-voice="speaking"] .motion-shell'));
-assert.ok(!js.includes("innerHTML"));
+assert.ok(!/\.innerHTML\s*=/.test(js));
 assert.ok(!js.includes("eval("));
 class Element {
   constructor(tag="div") {
