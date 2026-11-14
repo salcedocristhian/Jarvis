@@ -18,7 +18,7 @@ assert.ok(root.includes('id="menuBtn"') && root.includes('id="setBtn"') && root.
 assert.ok(src.includes('function preload()'));
 
 assert.ok(root.includes('ElevenAgents · conversación (sin API Key)'));
-assert.ok(root.includes('clientTools: { jobtread_read: agentJobTreadRead, gmail_read: agentGmailRead }'));
+assert.ok(root.includes('clientTools: { jobtread_read: agentJobTreadRead, gmail_read: agentGmailRead, web_research: agentWebResearch }'));
 assert.ok(root.includes('if (useAgentVoice()) startAgentVoice(q); else turn(q);'));
 assert.ok(root.includes('if (useAgentVoice()) {'));
 assert.ok(root.includes('if (handsfreePreferred) {'));
