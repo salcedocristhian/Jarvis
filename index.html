@@ -313,6 +313,7 @@ const prefs = {
   motion: store.get("motion", sysReduced ? "calm" : "full"),
   pass: store.get("pass", ""),
 };
+document.documentElement.dataset.motion = prefs.motion;
 const calm = () => prefs.motion === "calm";
 
 /* ---------------- estado ---------------- */
@@ -795,6 +796,7 @@ function showReel(out) {
   } else window.JarvisExplorer?.reset();
   if (hasMotion) {
     window.JarvisMotion.render(out.records, {
+      contextTitle: out.frames?.[0]?.text || out.records.title,
       openFirst: () => document.querySelector("#dataExplorer .explorer-row")?.click()
     });
   } else window.JarvisMotion?.reset();
@@ -1179,7 +1181,7 @@ bind("#optVoice", "voice", () => {
   }
   if (agentClient?.connected) stopAgentVoice();
   renderHandsfree();
-}); bind("#optLang", "lang", () => setPhase(phase)); bind("#optMotion", "motion");
+}); bind("#optLang", "lang", () => setPhase(phase)); bind("#optMotion", "motion", () => { document.documentElement.dataset.motion = prefs.motion; });
 [["#kClaude","k.claude"],["#kModel","k.model"],["#kJob","k.jobtread"],["#kPins","k.pinned"],["#kEleven","k.eleven"],["#kVoice","k.voiceId"]].forEach(([id,k]) => {
   const el = $(id); el.value = store.get(k, k === "k.model" ? "claude-sonnet-5-5" : "");
   el.addEventListener("change", () => { store.set(k, el.value.trim()); orgId = null; jtMode = "json"; });
