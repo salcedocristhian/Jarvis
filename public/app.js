@@ -398,7 +398,7 @@ $("#menuBtn").addEventListener("click", () => openSheet("menu"));
 $("#setBtn").addEventListener("click", () => openSheet("settings"));
 document.querySelectorAll("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
 function renderProjects() {
-  $("#projList").innerHTML = projects.length ? projects.map(p => `<button type="button" data-id="${esc(p.id)}"><span><b>${esc(p.label)}</b><small>${p.error ? esc(p.error) : (p.demoDetail ? esc(p.demoDetail) : `${esc(p.number || "")} · ${p.openTasks ?? 0} tareas abiertas · ${p.pendingDocs ?? 0} documentos pendientes`)}</small></span><i class="dot ${p.urgent ? "hot" : ""}"></i></button>`).join("")
+  $("#projList").innerHTML = projects.length ? projects.map(p => `<button type="button" data-id="${esc(p.id)}"><span><b>${esc(p.label)}</b><small>${p.error ? esc(p.error) : (p.demoDetail ? esc(p.demoDetail) : (p.openTasks == null ? `${esc(p.number || "Sin número")} · ${esc(p.status || "Estado no indicado")}` : `${esc(p.number || "")} · ${p.openTasks} tareas abiertas · ${p.pendingDocs ?? "?"} documentos pendientes`))}</small></span><i class="dot ${p.urgent ? "hot" : ""}"></i></button>`).join("")
     : `<p class="muted small">Agrega PINNED_JOBS en tu .env para ver tus proyectos aquí y como satélites del orbe.</p>`;
 }
 $("#projList").addEventListener("click", e => { const b = e.target.closest("[data-id]"); if (!b) return; $("#menu").close(); askAbout(projects.find(p => p.id === b.dataset.id)); });
@@ -530,7 +530,7 @@ async function boot() {
   try {
     status = await api("/api/status");
     if (status.passcode) $("#passRow").hidden = false;
-    if (status.claude !== "connected") demo = true;
+    if (status.claude !== "connected" && status.jobtread !== "connected") demo = true;
   } catch { demo = true; }
   $("#demoTag").hidden = !demo;
   renderConns();
