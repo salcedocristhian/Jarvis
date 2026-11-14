@@ -737,6 +737,7 @@ function clearReel() {
 const agentClient = window.JarvisElevenAgent;
 const useAgentVoice = () => prefs.voice === "agent" || (prefs.voice === "eleven" && !keys.eleven);
 let agentLastQuestion = "";
+let agentResponseSequence = 0, agentPendingRead = 0;
 function agentErrorMessage(e) {
   const msg = e?.message || String(e || "Error de ElevenAgents");
   return /failed to fetch|load|network|import/i.test(msg)
@@ -761,6 +762,15 @@ async function agentJobTreadRead({ question } = {}) {
     const out = await askJobTreadDirect(q);
     showReel(out);
     timeline.unshift({ q, a: out.speech }); renderHistory();
+    // The agent sometimes remained silent after a successful tool result.
+    // Only if no agent utterance follows do we send a verified speech
+    // continuation. This reuses the SAME confirmed result; no second API read.
+    const observedResponse = agentResponseSequence, readId = ++agentPendingRead;
+    setTimeout(() => {
+      if (readId !== agentPendingRead || !agentClient?.connected || agentResponseSequence !== observedResponse) return;
+      agentClient.send("LECTURA_VERIFICADA: " + out.speech.slice(0, 500));
+      stateEl.textContent = "Narrando respuesta verificada de JobTread";
+    }, 3600);
     return { ok: out.sources?.includes("JobTread") || false, speech: out.speech,
       project: out.project || null, sources: out.sources || [] };
   } catch (e) {
@@ -795,6 +805,7 @@ async function startAgentVoice(optionalQuestion = "") {
         if (!m?.text) return;
         if (m.speaker === "user") { agentLastQuestion = m.text; heardEl.textContent = m.text; }
         else if (m.speaker === "agent") {
+          agentResponseSequence++;
           heardEl.textContent = m.text;
           if (!reel.hidden) return;
           timeline.unshift({ q: agentLastQuestion, a: m.text }); renderHistory();
@@ -812,6 +823,7 @@ async function startAgentVoice(optionalQuestion = "") {
   }
 }
 async function stopAgentVoice() {
+  agentPendingRead++;
   try { await agentClient?.stop(); } catch (e) { console.warn("ElevenAgents:", e.message); }
   talking = false; document.body.classList.remove("talking"); setPhase("idle"); renderConns();
 }
