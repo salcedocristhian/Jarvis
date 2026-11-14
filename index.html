@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Unbounded:wght@600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./public/jarvis-explorer.css">
+<link rel="stylesheet" href="./public/jarvis-motion.css">
 <style>
 :root{
   --ink:#04070C; --deep:#0A1A30; --line:#1F3D5E; --mesh:#3F7DB5;
@@ -211,6 +212,7 @@ window.UNA_CONFIG = {
   </div>
 
   <section class="reel" id="reel" aria-live="polite" aria-label="Respuesta" hidden>
+    <div class="motion-stage" id="motionStage" hidden></div>
     <div class="frames" id="frames"></div>
     <div class="ticks" id="ticks" aria-hidden="true"></div>
     <div class="data-explorer" id="dataExplorer" hidden></div>
@@ -290,6 +292,7 @@ window.UNA_CONFIG = {
 <script src="https://accounts.google.com/gsi/client" id="google-identity-services" async defer></script>
 <script src="./public/gmail-readonly.js"></script>
 <script src="./public/jarvis-explorer.js"></script>
+<script src="./public/jarvis-motion.js"></script>
 <script>
 /* Una — cliente. Sin dependencias. */
 (() => {
@@ -310,6 +313,7 @@ const prefs = {
   motion: store.get("motion", sysReduced ? "calm" : "full"),
   pass: store.get("pass", ""),
 };
+document.documentElement.dataset.motion = prefs.motion;
 const calm = () => prefs.motion === "calm";
 
 /* ---------------- estado ---------------- */
@@ -757,6 +761,8 @@ function showReel(out) {
   clearTimeout(reelTimer);
   const hasRecords = Boolean(out?.records && Array.isArray(out.records.items));
   reel.classList.toggle("with-explorer", hasRecords);
+  const hasMotion = hasRecords && Boolean(window.JarvisMotion);
+  reel.classList.toggle("with-motion", hasMotion);
   if (hasRecords) {
     window.JarvisExplorer?.render(out.records, {
       onMore: async state => {
@@ -788,6 +794,12 @@ function showReel(out) {
       }
     });
   } else window.JarvisExplorer?.reset();
+  if (hasMotion) {
+    window.JarvisMotion.render(out.records, {
+      contextTitle: out.frames?.[0]?.text || out.records.title,
+      openFirst: () => document.querySelector("#dataExplorer .explorer-row")?.click()
+    });
+  } else window.JarvisMotion?.reset();
   reel.dataset.voice = phase;
   reelFrames = (out.frames && out.frames.length ? out.frames : [{ type: "headline", text: out.speech }]).slice(0, 6);
   framesEl.innerHTML = reelFrames.map(frameHTML).join("");
@@ -816,7 +828,16 @@ function clearReel() {
   clearTimeout(reelTimer);
   reel.classList.add("absorb");
   energyTarget = .9; setTimeout(() => { if (phase === "idle") energyTarget = .12; }, 500);
-  setTimeout(() => { reel.hidden = true; reel.classList.remove("absorb"); framesEl.innerHTML = ""; heardEl.textContent = ""; document.body.classList.remove("docked"); }, calm() ? 10 : 650);
+  setTimeout(() => {
+    reel.hidden = true;
+    reel.classList.remove("absorb");
+    reel.classList.remove("with-motion","with-explorer");
+    window.JarvisMotion?.reset();
+    window.JarvisExplorer?.reset();
+    framesEl.innerHTML = "";
+    heardEl.textContent = "";
+    document.body.classList.remove("docked");
+  }, calm() ? 10 : 650);
 }
 
 
@@ -1160,7 +1181,7 @@ bind("#optVoice", "voice", () => {
   }
   if (agentClient?.connected) stopAgentVoice();
   renderHandsfree();
-}); bind("#optLang", "lang", () => setPhase(phase)); bind("#optMotion", "motion");
+}); bind("#optLang", "lang", () => setPhase(phase)); bind("#optMotion", "motion", () => { document.documentElement.dataset.motion = prefs.motion; });
 [["#kClaude","k.claude"],["#kModel","k.model"],["#kJob","k.jobtread"],["#kPins","k.pinned"],["#kEleven","k.eleven"],["#kVoice","k.voiceId"]].forEach(([id,k]) => {
   const el = $(id); el.value = store.get(k, k === "k.model" ? "claude-sonnet-5-5" : "");
   el.addEventListener("change", () => { store.set(k, el.value.trim()); orgId = null; jtMode = "json"; });

@@ -130,3 +130,18 @@ La consulta oral muestra primero un **titular cinético y contador**; al mismo t
 **Accesibilidad:** controles de al menos 40–44 px, textos legibles y navegación manual; las listas mantienen su posición de desplazamiento y todos los textos externos se presentan como `textContent` (sin evaluar HTML). El movimiento complementa, pero no reemplaza, el acceso a datos. Los resultados son de solo lectura. Las llaves locales no se publican en GitHub.
 
 **Estado del piloto:** validado con pruebas automatizadas y registros simulados. La comprobación real de nuevas vistas y permisos sigue requiriendo abrir la versión publicada en Safari o Edge con las conexiones del usuario.
+
+
+## Motion Engine V2 — Gmail / JobTread / Budget (14 Nov 2026)
+
+La pantalla inicial continúa minimalista: **orbe, Menú y Ajustes**. Después de cada consulta autorizada, el explorador de registros aparece con una de tres escenas cinematográficas **generadas con HTML/CSS y los datos fuente reales**, no capturas ni videos precocinados:
+
+- **Gmail:** un sobre 3D estilizado se abre y extrae un papel holográfico. El asunto y remitente mostrado provienen del primer mensaje obtenido mediante el OAuth de Gmail. Se mantiene la lista real de correos y el botón para abrir el mensaje completo; no inventa archivos adjuntos.
+- **JobTread:** una estructura de líneas *conceptual* sube del escáner y está rotulada explícitamente **no es un plano del edificio**. El nombre, estado y módulos provienen de los registros reales de JobTread; el listado paginado y las fichas siguen funcionando.
+- **Budget:** tres nodos animados muestran los campos de fuente `Projected Price`, `Projected Cost` y `Actual Cost` solamente cuando la consulta autorizada los devuelve. No se supone que representen partidas excluyentes de una misma bolsa ni se calcula un saldo/restante inferido.
+
+Cada escena incluye animación de entrada, escaneo, iluminación, efectos de profundidad, etiquetas de origen y acción para abrir un registro. Las escenas se adaptan al estado de voz `listening`/`speaking` y a pantallas pequeñas. Respetan tanto `prefers-reduced-motion` de iOS como **Ajustes → Movimiento → Calmado**.
+
+La app sigue siendo lectura de solo Gmail/JobTread: no se añaden claves, permisos ni llamadas a servicios; los textos externos se insertan con `textContent`, sin interpretar HTML de terceros. El Motion Engine es una interpretación visual de registros consultados, **no sustituye los planos, el presupuesto original ni la evidencia verificable**. Se prueba con fixtures inventados únicamente en test, nunca publicados como información del usuario.
+
+Archivos: `public/jarvis-motion.js`, `public/jarvis-motion.css`, `test/motion-v2.mjs`. La inspección visual final debe hacerse en Safari/iPhone para validar contraste, rendimiento y accesibilidad.
