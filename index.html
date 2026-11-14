@@ -233,6 +233,7 @@ window.UNA_CONFIG = {
   <p class="muted small">Mantén presionado el orbe para escribir. Desliza hacia abajo para despejar la pantalla.</p>
 </dialog>
 
+<script src="./public/jobtread-direct.js"></script>
 <script>
 /* Una — cliente. Sin dependencias. */
 (() => {
@@ -390,6 +391,24 @@ async function loadProjects() {
       return { id: p.id, label: p.label, number: j.number, openTasks: j.tasks.count, pendingDocs: j.pending.count, urgent: j.pending.count > 0 };
     } catch (e) { return { id: p.id, label: p.label, error: e.message }; }
   }));
+}
+
+
+/* JobTread directo: consultas Pave fijas de solo lectura, sin Claude. */
+let lastDirectJobId = null;
+async function askJobTreadDirect(question) {
+  const result = await globalThis.JarvisDirect.answer(question, {
+    query: jt, orgId: await ensureOrg(), preferredJobId: lastDirectJobId
+  });
+  if (result.project) lastDirectJobId = result.project;
+  return result;
+}
+async function loadDirectProjects() {
+  if (!keys.jobtread) return [];
+  if (pinnedList().length) return loadProjects();
+  const result = await globalThis.JarvisDirect.listJobs(jt, await ensureOrg(), 12);
+  return result.jobs.map(j => ({ id: j.id, label: j.name, number: j.number,
+    status: j.status, openTasks: null, pendingDocs: null, urgent: false }));
 }
 
 /* prueba de conexiones (botón en Ajustes) */
@@ -598,7 +617,7 @@ async function turn(q) {
   history.push({ role: "user", content: q });
   let out;
   try {
-    out = demo ? await demoAnswer(q) : await askClaude();
+    out = demo ? await demoAnswer(q) : keys.claude ? await askClaude() : await askJobTreadDirect(q);
   } catch (e) {
     out = { speech: e.message, frames: [{ type: "headline", text: "No pude responder." }, { type: "evidence", title: e.message, detail: "", source: "Revisa Ajustes" }], closer: "" };
     history.pop();
@@ -756,7 +775,7 @@ $("#menuBtn").addEventListener("click", () => openSheet("menu"));
 $("#setBtn").addEventListener("click", () => openSheet("settings"));
 document.querySelectorAll("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
 function renderProjects() {
-  $("#projList").innerHTML = projects.length ? projects.map(p => `<button type="button" data-id="${esc(p.id)}"><span><b>${esc(p.label)}</b><small>${p.error ? esc(p.error) : (p.demoDetail ? esc(p.demoDetail) : `${esc(p.number || "")} · ${p.openTasks ?? 0} tareas abiertas · ${p.pendingDocs ?? 0} documentos pendientes`)}</small></span><i class="dot ${p.urgent ? "hot" : ""}"></i></button>`).join("")
+  $("#projList").innerHTML = projects.length ? projects.map(p => `<button type="button" data-id="${esc(p.id)}"><span><b>${esc(p.label)}</b><small>${p.error ? esc(p.error) : (p.demoDetail ? esc(p.demoDetail) : (p.openTasks == null ? `${esc(p.number || "Sin número")} · ${esc(p.status || "Estado no indicado")}` : `${esc(p.number || "")} · ${p.openTasks} tareas abiertas · ${p.pendingDocs ?? "?"} documentos pendientes`))}</small></span><i class="dot ${p.urgent ? "hot" : ""}"></i></button>`).join("")
     : `<p class="muted small">Agrega tus proyectos fijos en Ajustes para verlos aquí y como satélites del orbe.</p>`;
 }
 $("#projList").addEventListener("click", e => { const b = e.target.closest("[data-id]"); if (!b) return; $("#menu").close(); askAbout(projects.find(p => p.id === b.dataset.id)); });
@@ -891,13 +910,15 @@ async function demoAnswer(q) {
 
 /* ---------------- arranque ---------------- */
 async function boot() {
-  demo = /[?&]demo\b/.test(location.search) || !keys.claude;
+  demo = /[?&]demo\b/.test(location.search) || (!keys.claude && !keys.jobtread);
   status = { claude: keys.claude ? "connected" : "not_connected", jobtread: keys.jobtread ? "connected" : "not_connected", elevenlabs: keys.eleven && keys.voiceId ? "connected" : "not_connected", outlook: "not_connected" };
   $("#demoTag").hidden = !demo;
   renderConns();
-  projects = demo ? DEMO_PROJECTS : await loadProjects();
+  try { projects = demo ? DEMO_PROJECTS : keys.jobtread ? await loadDirectProjects() : []; }
+  catch (e) { projects = []; stateEl.textContent = "JobTread: " + e.message; }
+  if (!demo && keys.jobtread && !keys.claude && projects.length) stateEl.textContent = "JobTread listo · pregunta por tus proyectos";
   renderProjects();
-  if (!keys.claude && !store.get("seenSetup", "")) { store.set("seenSetup", "1"); stateEl.textContent = "Modo demo. Pon tu llave en Ajustes"; }
+  if (demo && !keys.jobtread && !store.get("seenSetup", "")) { store.set("seenSetup", "1"); stateEl.textContent = "Modo demo · conecta JobTread o Claude"; }
 }
 setPhase("idle"); renderHistory(); boot();
 })();
