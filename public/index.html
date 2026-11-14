@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#04070C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Una</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Unbounded:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="config.js"></script>
+</head>
+<body>
+<canvas id="bg" aria-hidden="true"></canvas>
+
+<header class="chrome">
+  <button class="tiny" id="menuBtn" type="button" aria-label="Menú" aria-haspopup="dialog">
+    <svg viewBox="0 0 24 24"><path d="M5 9h14M5 15h9"/></svg>
+  </button>
+  <span class="demo" id="demoTag" hidden>DEMO</span>
+  <button class="tiny" id="setBtn" type="button" aria-label="Ajustes" aria-haspopup="dialog">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8" stroke-dasharray="2.2 3.1"/></svg>
+  </button>
+</header>
+
+<main>
+  <div class="core">
+  <button class="orb" id="orb" type="button" aria-label="Hablar con Una">
+    <canvas id="orbCanvas" aria-hidden="true"></canvas>
+  </button>
+  <p class="state" id="state" role="status">Toca para hablar</p>
+  <p class="heard" id="heard" aria-live="polite"></p>
+  </div>
+
+  <section class="reel" id="reel" aria-live="polite" aria-label="Respuesta" hidden>
+    <div class="frames" id="frames"></div>
+    <div class="ticks" id="ticks" aria-hidden="true"></div>
+    <p class="closer" id="closer"></p>
+  </section>
+</main>
+
+<form class="typer" id="typer" hidden>
+  <label class="sr" for="typeIn">Escríbele a Una</label>
+  <input id="typeIn" autocomplete="off" placeholder="Escríbele a Una">
+  <button class="tiny solid" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
+</form>
+
+<dialog class="sheet" id="menu" aria-label="Menú">
+  <div class="grab"></div>
+  <h2>Proyectos.</h2>
+  <div id="projList" class="plist"></div>
+  <h2>Hoy.</h2>
+  <div id="hist" class="hist"><p class="muted">Todavía no han hablado.</p></div>
+  <h2>Conexiones.</h2>
+  <ul id="conns" class="conns"></ul>
+</dialog>
+
+<dialog class="sheet" id="settings" aria-label="Ajustes">
+  <div class="grab"></div>
+  <h2>Ajustes.</h2>
+  <label class="opt">Voz
+    <select id="optVoice"><option value="eleven">ElevenLabs</option><option value="browser">Del navegador</option><option value="off">Silencio (solo texto)</option></select>
+  </label>
+  <label class="opt">Idioma
+    <select id="optLang"><option value="es-US">Español</option><option value="en-US">English</option></select>
+  </label>
+  <label class="opt">Movimiento
+    <select id="optMotion"><option value="full">Completo</option><option value="calm">Calmado</option></select>
+  </label>
+  <label class="opt" id="passRow" hidden>Código de acceso
+    <input id="optPass" type="password" autocomplete="current-password">
+  </label>
+  <p class="muted small">Mantén presionado el orbe para escribir. Desliza hacia abajo para despejar la pantalla.</p>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

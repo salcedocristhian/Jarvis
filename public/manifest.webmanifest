@@ -1,0 +1,9 @@
+{
+  "name": "Una",
+  "short_name": "Una",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#04070C",
+  "theme_color": "#04070C",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
