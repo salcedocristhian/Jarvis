@@ -69,7 +69,7 @@
     const n = NAMES[prov];
     await eng.clearSubs();
     if(prov === "microsoft" && !A().microsoftReady()){
-      await say("Outlook support is still being wired up. Chris owes me that one. Let's use Google for now, or come back later.");
+      await say("Outlook support isn't configured yet. Let's use Google for now, or come back later.");
       const pick = await eng.choose([{ label:"Use Gmail", value:"google", primary:true }, { label:"Later", value:"later" }]);
       return pick === "google" ? mailStep("google") : finish(null);
     }
@@ -156,7 +156,7 @@
   }
 
   /* ---------- entry points ---------- */
-  const INTRO1 = "Hi. I'm Onix, your new personal assistant. Chris set me up for you, so any complaints go to him.";
+  const INTRO1 = "Hi. I'm Onix, your personal assistant. Let's get everything ready.";
   const INTRO2 = "Let's get acquainted. Where does your email live?";
   let onDoneCb = null;
   async function start({ onDone } = {}){
@@ -193,12 +193,21 @@
     open("Reconnect"); await boot();
     if(prov === "google") A().loadGoogle().catch(() => {});
     const who = A().callName();
-    await eng.say(`Welcome back${who ? ", " + who : ""}. One tap and I'm back in your accounts.`);
+    const welcome = `Welcome back${who ? ", " + who : ""}. One tap and I'm back in your accounts.`;
+    // Show the welcome immediately. iOS only allows audible speech after a real tap,
+    // so start its audio within the existing Connect button's gesture (no extra tap).
+    await eng.say(welcome);
+    let welcomeAudio = Promise.resolve();
     const res = await eng.confirmButton({
       text:`Reconnect ${NAMES[prov].who}`, status:`Checking with ${NAMES[prov].who}`, done:"Reconnected", secondary:"Not now",
-      onTap: () => prov === "google" ? A().connectGoogle(ids) : A().connectMicrosoft(ids, "reconnect")
+      onTap: () => {
+        welcomeAudio = scope.OnixVoice ? scope.OnixVoice.say(welcome) : deviceSay(welcome);
+        // OAuth must still start synchronously inside the same user gesture.
+        return prov === "google" ? A().connectGoogle(ids) : A().connectMicrosoft(ids, "reconnect");
+      }
     });
     await eng.clearSubs();
+    await welcomeAudio.catch(() => {});
     const done = onDoneCb; onDoneCb = null;
     await close(); done?.(res.ok ? p : null);
     return true;
