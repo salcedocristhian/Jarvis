@@ -1226,8 +1226,8 @@ function startServerMeter() {
 }
 function voiceBudgetSpent(reason) {
   const chat = Boolean(window.OnixChat?.ready());
-  const line = (reason === "month" ? "The fancy voice is used up for the month. Chris is cheap. " : "That's all the fancy voice I get today. Chris is cheap. ")
-    + (chat ? "Hold the orb and type to me. That part's free." : "Come back tomorrow.");
+  const line = (reason === "month" ? "Premium voice time has reached its monthly limit. " : "Premium voice time has reached today's limit. ")
+    + (chat ? "You can still type to me. Press and hold the orb." : reason === "month" ? "Voice will be available when the monthly allowance resets." : "Voice will be available again tomorrow.");
   setPhase("idle", line); heardEl.textContent = line;
   const H = window.OnixHome;
   if (H?.mounted) { H.setState("idle"); H.reply(line, { rate: 1 }); H.freeVoice(line); }

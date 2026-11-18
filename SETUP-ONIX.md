@@ -57,7 +57,7 @@ FIRST CONVERSATION: if {{first_conversation}} is "yes", before anything else run
 Close with a 2-line summary and "Recon complete. Chris will see this."
 ```
 
-**First message:** `Hey {{user_name}}. What do you need?`
+**First message:** dejar vacío. ÓNIX ya tiene su bienvenida inicial en la app; al tocar el orbe, ElevenLabs debe escuchar sin decir "Jarvis en línea" ni presentar al asistente otra vez.
 
 **Dynamic variables** (con valor de prueba): `user_name`=Chris, `user_email`=test@example.com, `user_role`=admin, `connector_requests`=none, `voice_seconds_left`=-1, `first_conversation`=no, `today`=Tuesday, November 17, 2026, `time_zone`=America/New_York.
 
