@@ -68,7 +68,7 @@
     const n = NAMES[prov];
     await eng.clearSubs();
     if(prov === "microsoft" && !A().microsoftReady()){
-      await say("Outlook support is still being wired up. Chris owes me that one. Let's use Google for now, or come back later.");
+      await say("Outlook sign-in isn't configured yet. You can use Google now or connect Outlook later.");
       const pick = await eng.choose([{ label:"Use Gmail", value:"google", primary:true }, { label:"Later", value:"later" }]);
       return pick === "google" ? mailStep("google") : finish(null);
     }
@@ -187,7 +187,7 @@
     onDoneCb = onDone;
     open("ÓNIX setup"); await boot();
     await eng.tapToStart("Tap to wake ÓNIX");
-    await say("Hi. I'm Onix, your new personal assistant. Chris set me up for you, so any complaints go to him.");
+    await say("Hi. I'm Onix, your personal assistant. Let's get your accounts connected.");
     await eng.clearSubs();
     await say("Let's get acquainted. Where does your email live?");
     const prov = await eng.choose([{ label:"Gmail", value:"google", primary:true }, { label:"Outlook or Microsoft 365", value:"microsoft" }]);
