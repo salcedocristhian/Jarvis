@@ -7,13 +7,14 @@ const hash = s => createHash("sha256").update(s).digest("hex");
 const ORIGIN = "https://salcedocristhian.github.io";
 function kv(){ const m = new Map(); return { m, async get(k, t){ const v = m.get(k); return v == null ? null : t === "json" ? JSON.parse(v) : t === "arrayBuffer" ? v : String(v); }, async put(k, v){ m.set(k, typeof v === "string" ? v : v instanceof ArrayBuffer ? v : String(v)); } }; }
 const calls = [], ttsCalls = [];
+let elevenQuotaSpent = false;
 const people = { "tok-guest":{ email:"douglas@gmail.com", given_name:"Douglas", email_verified:true }, "tok-admin":{ email:"Chris@Example.com", given_name:"Chris", email_verified:true } };
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url); calls.push({ url, opts });
   const ok = b => new Response(JSON.stringify(b), { status:200, headers:{ "Content-Type":"application/json" } });
   if(url.startsWith("https://www.googleapis.com/oauth2/v3/userinfo")){ const p = people[(opts.headers?.Authorization || "").slice(7)]; return p ? ok(p) : new Response("{}", { status:401 }); }
   if(url.startsWith("https://api.elevenlabs.io/v1/convai/agents/")) return ok({ conversation_config:{ tts:{ voice_id:"VOICE123", model_id:"eleven_flash_v2" } } });
-  if(url.startsWith("https://api.elevenlabs.io/v1/text-to-speech/")){ ttsCalls.push(JSON.parse(opts.body)); assert.match(url, /VOICE123/); return new Response(new Uint8Array([73, 68, 51, 1, 2, 3]), { status:200, headers:{ "Content-Type":"audio/mpeg" } }); }
+  if(url.startsWith("https://api.elevenlabs.io/v1/text-to-speech/")){ ttsCalls.push(JSON.parse(opts.body)); assert.match(url, /VOICE123/); return elevenQuotaSpent ? new Response("quota", { status:429 }) : new Response(new Uint8Array([73, 68, 51, 1, 2, 3]), { status:200, headers:{ "Content-Type":"audio/mpeg" } }); }
   if(url.startsWith("https://api.elevenlabs.io/")){ assert.equal(opts.headers["xi-api-key"], "xi-secret"); return ok({ signed_url:"wss://api.elevenlabs.io/v1/convai/conversation?agent_id=x&conversation_signature=abc" }); }
   if(url.startsWith("https://api.search.brave.com/")) return ok({ web:{ results:[{ title:"Miami-Dade permits", url:"https://www.miamidade.gov/permits", description:"Permit <b>hours</b> 8–4." }] } });
   if(url.includes("generativelanguage.googleapis.com")) return ok({ candidates:[{ content:{ parts:[{ text:"Backup answer." }] } }] });
@@ -45,6 +46,10 @@ assert.equal((await tts({ text:"Evening, Doug. 14 unread.", provider:"google", t
 assert.equal((await tts({ text:"And this one goes over the limit.", provider:"google", token:"tok-guest" })).status, 429, "guest daily voice limit");
 assert.equal((await tts({ text:"And this one goes over the limit.", provider:"google", token:"tok-admin" })).status, 200, "admin has no voice limit");
 delete env.TTS_DAILY_CHARS;
+elevenQuotaSpent = true;
+assert.equal((await tts({ text:"The voice credits have run out.", provider:"google", token:"tok-admin" })).status, 429,
+  "upstream ElevenLabs quota exhaustion reaches the client so it can switch to browser speech");
+elevenQuotaSpent = false;
 
 // Guest: permit with private link, deposit charged, daily cap enforced
 let r = await post("/voice/permit", { provider:"google", token:"tok-guest" });
