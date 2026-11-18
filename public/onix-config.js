@@ -4,7 +4,10 @@ window.ONIX_CONFIG = {
   // SHA-256 of each administrator's email, lowercase. Admins get the premium ElevenLabs voice without a daily cap
   // and see JobTread. Hashing keeps the address out of the public repo.
   // To add one: in a terminal, run   printf '%s' 'name@company.com' | shasum -a 256
-  adminEmailHashes: ["192415de7da4a638b541cfd10a9ae75cd79a2d52463f27ee4bfa0629cb4565f2"],
+  adminEmailHashes: [
+    "192415de7da4a638b541cfd10a9ae75cd79a2d52463f27ee4bfa0629cb4565f2",
+    "27fba9e0eb60ca1e4d5e58362271243c9597f8aa7273a68a1ad9f554faa47472"
+  ],
   google: {
     // Web OAuth client from Google Cloud (the same one Jarvis already uses for Gmail).
     clientId: "177629728774-f6bbak14vnrn2ud6573dinaj1gt2suc6.apps.googleusercontent.com"
