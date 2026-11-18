@@ -90,3 +90,6 @@
 .onx-draft{width:100%;box-sizing:border-box;border-radius:12px;border:1px solid var(--line);background:rgba(4,7,12,.7);color:var(--paper);font:inherit;font-size:15px;line-height:1.45;padding:12px;resize:vertical;-webkit-user-select:text;user-select:text}
 .onx-draft:focus{outline:2px solid var(--sky);outline-offset:1px}
 .onx-draft:disabled{opacity:.75}
+.onx-root .lab.side{transform:translate(0,-50%);text-align:left}
+.onx-root .lab.side b{color:var(--brass);font-family:var(--text);font-weight:600;font-size:13px}
+.onx-root .lab.valve b{color:var(--brass)}

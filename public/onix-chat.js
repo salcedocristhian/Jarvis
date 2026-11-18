@@ -43,7 +43,7 @@
       const { reply, sources } = await ask(text);
       H()?.setState("idle");
       const said = reply + (sources?.length ? ` (${new URL(sources[0].url).hostname})` : "");
-      await Promise.all([H()?.reply(said, { rate:1 }), H()?.freeVoice(reply)]);
+      await H()?.speak(said);
       return reply;
     } catch(e){ H()?.setState("idle"); const m = String(e.message || e); H()?.reply(m, { rate:1 }); return m; }
   }

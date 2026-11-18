@@ -17,6 +17,10 @@ const DEFAULTS = {
   GUEST_MONTH_SECONDS: "6000",    // all guests together per month (100 min). The rest of the plan stays for admins.
   PERMIT_DEPOSIT_SECONDS: "20",   // charged up front on every voice start, so skipped reports still cost something
   ASK_DAILY: "80",                // free text answers per person per day
+  TTS_DAILY_CHARS: "2500",        // new spoken characters per guest per day (repeated lines are free: cached)
+  ANON_TTS_DAILY_CHARS: "4000",   // before sign-in (welcome lines), for everyone together per day
+  VOICE_ID: "",                   // empty = the same voice as the ElevenLabs agent
+  TTS_MODEL: "",                  // empty = the agent's model, or eleven_flash_v2_5
   AI_MODEL: "@cf/meta/llama-3.1-8b-instruct",
   GEMINI_MODEL: "gemini-2.5-flash"
 };
@@ -93,6 +97,55 @@ async function permit(env, who){
   return { ok:true, signedUrl, secondsLeft:who.admin ? -1 : Math.max(0, left - num(env, "PERMIT_DEPOSIT_SECONDS")), admin:who.admin };
 }
 
+/* ---------- one voice everywhere: ElevenLabs speech, cached ---------- */
+async function agentVoice(env){
+  const hit = await env.ONIX_KV.get("voice:agent", "json");
+  if(hit) return hit;
+  let voice = { id:cfg(env, "VOICE_ID"), model:cfg(env, "TTS_MODEL") };
+  if(!voice.id){
+    const r = await fetch(`https://api.elevenlabs.io/v1/convai/agents/${encodeURIComponent(cfg(env, "AGENT_ID"))}`, { headers:{ "xi-api-key":env.ELEVENLABS_API_KEY } });
+    if(!r.ok) throw httpError(502, "Couldn't read the agent's voice.");
+    const a = await r.json(), tts = a?.conversation_config?.tts || {};
+    voice = { id:tts.voice_id || "", model:voice.model || tts.model_id || "" };
+    if(!voice.id) throw httpError(502, "The agent has no voice set.");
+  }
+  // Agent-only models can't do plain speech; flash sounds the same voice and is the cheapest.
+  if(!voice.model || /conversational|_v2_5_conv/i.test(voice.model)) voice.model = "eleven_flash_v2_5";
+  await env.ONIX_KV.put("voice:agent", JSON.stringify(voice), { expirationTtl:86400 });
+  return voice;
+}
+async function tts(env, req, body){
+  if(!env.ELEVENLABS_API_KEY) throw httpError(501, "Voice isn't set up on the server.");
+  const text = String(body.text || "").replace(/\s+/g, " ").trim();
+  if(!text || text.length > 600) throw httpError(400, "Text must be 1 to 600 characters.");
+  const voice = await agentVoice(env);
+  const key = "tts:" + await sha256(voice.id + "|" + voice.model + "|" + text);
+  const audioHeaders = { "Content-Type":"audio/mpeg", "Cache-Control":"private, max-age=86400", ...cors(env, req) };
+  const cached = await env.ONIX_KV.get(key, "arrayBuffer");
+  if(cached) return new Response(cached, { headers:audioHeaders });
+  // New audio costs credits: guests and the welcome screen have daily limits.
+  if(body.token){
+    const who = await identify(env, body.provider, body.token);
+    if(!who.admin){
+      const k = `ttsc:${who.hash}:${today()}`, used = Number(await env.ONIX_KV.get(k)) || 0;
+      if(used + text.length > num(env, "TTS_DAILY_CHARS")) throw httpError(429, "Voice limit for today.");
+      await env.ONIX_KV.put(k, String(used + text.length), { expirationTtl:172800 });
+    }
+  } else {
+    if(text.length > 260) throw httpError(401, "Sign in first.");
+    const k = `ttsanon:${today()}`, used = Number(await env.ONIX_KV.get(k)) || 0;
+    if(used + text.length > num(env, "ANON_TTS_DAILY_CHARS")) throw httpError(429, "Voice limit for today.");
+    await env.ONIX_KV.put(k, String(used + text.length), { expirationTtl:172800 });
+  }
+  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice.id)}?output_format=mp3_44100_64`, {
+    method:"POST", headers:{ "xi-api-key":env.ELEVENLABS_API_KEY, "Content-Type":"application/json", Accept:"audio/mpeg" },
+    body:JSON.stringify({ text, model_id:voice.model }) });
+  if(!r.ok) throw httpError(502, "ElevenLabs couldn't speak that.");
+  const buf = await r.arrayBuffer();
+  await env.ONIX_KV.put(key, buf, { expirationTtl:2592000 });
+  return new Response(buf, { headers:audioHeaders });
+}
+
 /* ---------- free AI ---------- */
 const SYSTEM = `You are ÓNIX, a sarcastic but genuinely useful personal assistant on a phone. Speak English, short answers (1-3 sentences) unless asked for more.
 Sarcasm is for the chat only: anything written for someone else (an email, a message) is plain and professional.
@@ -160,6 +213,7 @@ export default {
     if(!cfg(env, "ALLOWED_ORIGIN").split(",").map(s => s.trim()).includes(origin)) return json(env, req, { ok:false, error:"Origin not allowed." }, 403);
     try {
       const body = await req.json().catch(() => ({}));
+      if(url.pathname === "/tts") return await tts(env, req, body);
       const who = await identify(env, body.provider, body.token);
       switch(url.pathname){
         case "/voice/permit": return json(env, req, await permit(env, who));

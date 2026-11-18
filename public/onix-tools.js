@@ -71,6 +71,15 @@
     if(!scope.OnixChat?.ready()) return out({ ok:false, error:"Web search isn't set up yet." });
     try { return out({ ok:true, results:await scope.OnixChat.search(q) }); } catch(e){ return fail(e); }
   }
+  // Chris's project repos on GitHub (read-only). Only projects this person may see.
+  async function project_read({ project = "", topic = "" } = {}){
+    try {
+      if(!scope.OnixProjects) return out({ ok:false, error:"Projects aren't set up." });
+      const r = await scope.OnixProjects.read(String(project).slice(0, 80), String(topic).slice(0, 80));
+      if(r.ok) H()?.showProject(r);
+      return out(r);
+    } catch(e){ return fail(e); }
+  }
   // The old Gmail tool name still works, answered by the new reader.
   const gmail_read = ({ question } = {}) => {
     const q = String(question || ""), filt = /unread|sin leer|no le[ií]d/i.test(q) ? "unread" : /important|importante/i.test(q) ? "important" : /today|hoy/i.test(q) ? "today" : "";
@@ -79,7 +88,7 @@
   };
 
   scope.OnixTools = Object.freeze({
-    handlers: () => ({ mail_search, mail_read, calendar_read, drive_search, reply_email, answer_invite, web_search, gmail_read }),
+    handlers: () => ({ mail_search, mail_read, calendar_read, drive_search, reply_email, answer_invite, web_search, gmail_read, project_read }),
     _cache:cache
   });
 })(globalThis);

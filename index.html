@@ -17,8 +17,6 @@
 <link rel="stylesheet" href="./public/jarvis-explorer.css">
 <link rel="stylesheet" href="./public/jarvis-motion.css">
 <link rel="stylesheet" href="./public/onix.css">
-<link rel="stylesheet" href="./public/master-hub.css">
-<script src="./public/master-hub.js" defer></script>
 <style>
 /* ÓNIX home: the orb layer replaces the old background and orb; answers from the old reel still appear on top. */
 .onx-home{position:fixed;inset:0;z-index:0;background:var(--ink)}
@@ -242,10 +240,10 @@ window.UNA_CONFIG = {
 <dialog class="sheet gmail-welcome" id="gmailWelcome" aria-labelledby="gmailWelcomeTitle">
   <div class="grab"></div>
   <p class="muted small">INICIO · GMAIL</p>
-  <h2 id="gmailWelcomeTitle">Conecta tu cuenta de Google a ÓNIX.</h2>
-  <p class="gmail-intro">Un permiso de Google para Gmail, Calendar y Drive (solo lectura). Tú eliges qué servicios autorizar.</p>
+  <h2 id="gmailWelcomeTitle">Conecta Gmail a Jarvis.</h2>
+  <p class="gmail-intro">Conecta tu cuenta con Google y podrás consultar tus correos con la voz de Jarvis, sin entrar a Ajustes.</p>
   <div class="welcome-actions">
-    <button class="btn primary" type="button" id="gmailWelcomeConnect">Conectar Google</button>
+    <button class="btn primary" type="button" id="gmailWelcomeConnect">Conectar Gmail</button>
     <button class="btn ghost" type="button" id="gmailWelcomeSkip">Ahora no</button>
   </div>
   <p class="muted small" id="gmailWelcomeStatus" role="status" aria-live="polite">Solo lectura. Google controla la autorización.</p>
@@ -287,13 +285,13 @@ window.UNA_CONFIG = {
     <label class="opt col">Llave de ElevenLabs TTS (opcional; no necesaria con ElevenAgents)<input id="kEleven" type="password" autocomplete="off"></label>
     <label class="opt col">Voice ID para TTS manual (opcional)<input id="kVoice" autocomplete="off"></label>
   </div>
-  <h2>Google · Gmail, Calendar y Drive (solo lectura).</h2>
-  <p class="muted small">Conecta los tres servicios en una sola autorización. Google solicitará tu permiso para cada uno. Jamás escribas tu contraseña aquí.</p>
+  <h2>Gmail (solo lectura).</h2>
+  <p class="muted small">Conecta tu cuenta directamente con Google. Jamás escribas tu contraseña aquí. Google solicitará tu autorización.</p>
   <label class="opt col">Google OAuth Client ID (público)
     <input id="gmailClientId" autocomplete="off" placeholder="123456789-abc.apps.googleusercontent.com">
   </label>
   <div class="btnrow">
-    <button class="btn primary" type="button" id="gmailConnect">Conectar servicios de Google</button>
+    <button class="btn primary" type="button" id="gmailConnect">Conectar Gmail con Google</button>
     <button class="btn ghost" type="button" id="gmailDisconnect">Desconectar Gmail</button>
   </div>
   <p class="muted small" id="gmailStatus">No conectado. Requiere OAuth Client ID web, Gmail API habilitada y autorización de Google. No guarda tokens entre sesiones.</p>
@@ -307,8 +305,8 @@ window.UNA_CONFIG = {
 <script src="./public/eleven-agent-client.js"></script>
 <script src="https://accounts.google.com/gsi/client" id="google-identity-services" async defer></script>
 <script src="./public/gmail-readonly.js"></script>
-<script src="./public/web-research.js"></script>
 <script src="./public/onix-config.js"></script>
+<script src="./public/onix-voice.js"></script>
 <script src="./public/onix-engine.js"></script>
 <script src="./public/onix-accounts.js"></script>
 <script src="./public/onix-onboarding.js"></script>
@@ -316,6 +314,7 @@ window.UNA_CONFIG = {
 <script src="./public/onix-data.js"></script>
 <script src="./public/onix-home.js"></script>
 <script src="./public/onix-tools.js"></script>
+<script src="./public/onix-projects.js"></script>
 <script src="./public/onix-chat.js"></script>
 <script src="./public/jarvis-explorer.js"></script>
 <script src="./public/jarvis-motion.js"></script>
@@ -779,11 +778,6 @@ function frameHTML(f) {
     }
     case "capability":
       return '<div class="frame f-insight"><article class="insight-card future-card"><small class="insight-tag">'+esc(f.tag||"VISIÓN FUTURA · NO CONECTADA")+'</small><p class="insight-title">'+esc(f.title||"")+'</p><p class="insight-note">'+esc(f.note||"")+'</p></article></div>';
-    case "web-source": {
-      let safe = "";
-      try { const u = new URL(f.link || ""); if (u.protocol === "https:" && !u.username && !u.password) safe = u.href; } catch (_) {}
-      return '<div class="frame f-insight"><article class="insight-card"><small class="insight-tag">FUENTE PÚBLICA · INTERNET</small><p class="insight-title">'+esc(f.title||"Fuente")+'</p>'+(safe?'<a class="source-link" href="'+esc(safe)+'" target="_blank" rel="noopener noreferrer">Consultar fuente ↗</a>':'')+'</article></div>';
-    }
     case "evidence":
       return `<div class="frame f-evidence"><div class="card"><b>${esc(f.title)}</b>${f.detail ? `<p>${esc(f.detail)}</p>` : ""}<small>${esc(f.source || "")}</small></div></div>`;
     case "action":
@@ -897,7 +891,6 @@ function clearReel() {
    The JobTread Grant Key, when present, remains on this device. */
 const agentClient = window.JarvisElevenAgent;
 const gmailClient = window.JarvisGmail;
-const webResearch = window.JarvisWebResearch;
 let handsfreePreferred = store.get("handsfreeEnabled", "0") === "1";
 let handsfreeSessionStarted = false;
 const handsfreeToggle = $("#handsfreeToggle");
@@ -957,17 +950,17 @@ function noteRealToolCall() {
 function handleLeakedToolCode(text) {
   // Never eval model-generated tool_code. Only dispatch the two known
   // read-only tools, with the last actual user question as input.
-  const match = String(text || "").match(/^\s*tool_code\s*[\r\n]+[\s\S]{0,160}?default_api\.(gmail_read|jobtread_read|web_research)\s*\(/i);
+  const match = String(text || "").match(/^\s*tool_code\s*[\r\n]+[\s\S]{0,160}?default_api\.(gmail_read|jobtread_read)\s*\(/i);
   if (!match) return false;
   clearTimeout(agentPseudoToolTimer);
-  stateEl.textContent = "Consultando " + (match[1] === "gmail_read" ? "Gmail" : match[1] === "web_research" ? "Internet" : "JobTread");
+  stateEl.textContent = "Consultando " + (match[1] === "gmail_read" ? "Gmail" : "JobTread");
   const question = String(agentLastQuestion || "").trim();
   if (!question) return true;
   const generation = agentToolCount;
   agentPseudoToolTimer = setTimeout(() => {
     agentPseudoToolTimer = null;
     if (!agentClient?.connected || agentToolCount !== generation) return;
-    const reader = match[1] === "gmail_read" ? agentGmailRead : match[1] === "web_research" ? agentWebResearch : agentJobTreadRead;
+    const reader = match[1] === "gmail_read" ? agentGmailRead : agentJobTreadRead;
     reader({ question }).catch(e => { stateEl.textContent = "Consulta no disponible: " + String(e.message || e).slice(0, 100); });
   }, 950);
   return true;
@@ -1083,25 +1076,6 @@ async function agentGmailRead({ question } = {}) {
   }
 }
 
-// Keep the existing ElevenLabs web_research client tool available alongside ÓNIX's web_search.
-// Research stays opt-in until its private Cloudflare endpoint is configured.
-async function agentWebResearch({ question } = {}) {
-  noteRealToolCall();
-  const q = String(question || agentLastQuestion || "").trim().slice(0, 600);
-  setPhase("thinking", "Investigando fuentes públicas");
-  const result = webResearch?.search
-    ? await webResearch.search({ question: q })
-    : { ok: false, grounded: false, speech: "La búsqueda web todavía no está configurada.", sources: [] };
-  const frames = [{ type: "headline", text: result.ok ? "Investigación web" : "Internet no disponible" }];
-  for (const source of result.sources || []) frames.push({ type: "web-source", title: source.title, link: source.url });
-  if (!result.grounded) frames.push({ type: "evidence", title: result.ok ? "Fuentes no verificadas" : "Consulta pendiente", detail: result.speech, source: "Investigación web" });
-  const out = { speech: result.speech, frames, closer: result.grounded ? "Fuentes públicas · Verifica antes de tomar decisiones." : "No confirmada con fuentes externas." };
-  showReel(out);
-  timeline.unshift({ q, a: result.speech }); renderHistory();
-  narrateVerifiedResult(out, "Internet");
-  return { ok: result.ok, speech: result.speech, grounded: result.grounded, sources: result.sources || [] };
-}
-
 async function startAgentVoice(optionalQuestion = "") {
   if (!agentClient) { setPhase("idle", "ElevenAgents no cargó."); return; }
   if (agentClient.connected) {
@@ -1115,6 +1089,7 @@ async function startAgentVoice(optionalQuestion = "") {
   agentLastQuestion = optionalQuestion;
   const OA = window.OnixAccounts, admin = Boolean(OA?.isAdmin()), server = Boolean(window.OnixChat?.ready()), H = window.OnixHome;
   if (OA && !admin && !server && OA.budget.left() <= 0) { voiceBudgetSpent(); return; }
+  window.OnixVoice?.stop();
   H?.setState("connecting");
   try {
     // With the ÓNIX server, voice starts only with its private link, and only while there is budget.
@@ -1125,7 +1100,7 @@ async function startAgentVoice(optionalQuestion = "") {
       signedUrl = permit.signedUrl;
     }
     const onixTools = window.OnixTools?.handlers() || { gmail_read: agentGmailRead };
-    const tools = { ...onixTools, web_research: agentWebResearch, ...(admin ? { jobtread_read: agentJobTreadRead } : {}), set_nickname: agentSetNickname };
+    const tools = { ...onixTools, ...(admin ? { jobtread_read: agentJobTreadRead } : {}), set_nickname: agentSetNickname };
     let connectedAt = 0;
     const session = await agentClient.start({
       clientTools: tools,
@@ -1194,13 +1169,15 @@ function onixVariables() {
     user_email: p.email || "unknown",
     user_role: OA?.isAdmin() ? "admin" : "guest",
     connector_requests: (OA?.requests() || []).join(", ") || "none",
+    projects: onixProjectNames || "none",
     voice_seconds_left: OA?.isAdmin() ? -1 : OA?.budget.left() ?? 0,
     first_conversation: (() => { try { return localStorage.getItem("una.onix.recon") === "1" ? "no" : "yes"; } catch { return "no"; } })(),
     today: new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }),
     time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone
   };
 }
-let voiceMeter = 0;
+let voiceMeter = 0, onixProjectNames = "";
+function refreshProjectNames() { window.OnixProjects?.list().then(l => { onixProjectNames = l.map(p => p.name).join(", "); }).catch(() => {}); }
 function startVoiceMeter() {
   stopVoiceMeter();
   voiceMeter = setInterval(() => {
@@ -1226,11 +1203,11 @@ function startServerMeter() {
 }
 function voiceBudgetSpent(reason) {
   const chat = Boolean(window.OnixChat?.ready());
-  const line = (reason === "month" ? "Premium voice time has reached its monthly limit. " : "Premium voice time has reached today's limit. ")
-    + (chat ? "You can still type to me. Press and hold the orb." : reason === "month" ? "Voice will be available when the monthly allowance resets." : "Voice will be available again tomorrow.");
+  const line = (reason === "month" ? "The fancy voice is used up for the month. Chris is cheap. " : "That's all the fancy voice I get today. Chris is cheap. ")
+    + (chat ? "Hold the orb and type to me. That part's free." : "Come back tomorrow.");
   setPhase("idle", line); heardEl.textContent = line;
   const H = window.OnixHome;
-  if (H?.mounted) { H.setState("idle"); H.reply(line, { rate: 1 }); H.freeVoice(line); }
+  if (H?.mounted) { H.setState("idle"); H.speak(line); }
   else { try { const u = new SpeechSynthesisUtterance(line); u.lang = "en-US"; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch {} }
 }
 
@@ -1353,22 +1330,10 @@ async function connectGmailFromButton() {
   gmailStatusEl.textContent = "Solicitando autorización directamente a Google…";
   gmailWelcomeStatus.textContent = "Conectando con Google…";
   try {
-    const accounts = window.OnixAccounts;
-    const useOnix = accounts && !/[?&]classic\b/.test(location.search) && id === window.ONIX_CONFIG?.google?.clientId;
-    if (useOnix) {
-      const result = await accounts.connectGoogleWorkspace();
-      applyProfile(result.profile);
-      const connected = result.granted.map(x => ({ gmail:"Gmail", gcal:"Calendar", gdrive:"Drive" })[x]).filter(Boolean);
-      gmailStatusEl.textContent = "Google autorizado: " + (connected.join(", ") || "ningún servicio de lectura") + ".";
-      gmailWelcomeStatus.textContent = gmailStatusEl.textContent;
-      if (result.granted.includes("gmail") && gmailWelcome.open) gmailWelcome.close();
-    } else {
-      // Classic mode and custom OAuth clients keep their historical Gmail-only behavior.
-      await gmailClient.connect(id);
-      gmailStatusEl.textContent = "Gmail autorizado solo para lectura en esta sesión.";
-      gmailWelcomeStatus.textContent = "Gmail conectado.";
-      if (gmailWelcome.open) gmailWelcome.close();
-    }
+    await gmailClient.connect(id);
+    gmailStatusEl.textContent = "Gmail autorizado solo para lectura en esta sesión. Puedes preguntar por tus correos.";
+    gmailWelcomeStatus.textContent = "Gmail conectado.";
+    if (gmailWelcome.open) gmailWelcome.close();
   } catch (e) {
     const message = "Gmail sin conectar: " + String(e.message || e).slice(0, 200);
     gmailStatusEl.textContent = message;
@@ -1383,11 +1348,8 @@ gmailSettingsConnect.addEventListener("click", connectGmailFromButton);
 gmailWelcomeConnect.addEventListener("click", connectGmailFromButton);
 $("#gmailWelcomeSkip").addEventListener("click", () => gmailWelcome.close());
 $("#gmailDisconnect").addEventListener("click", () => {
-  if (window.OnixAccounts?.provider() === "google" && !/[?&]classic\b/.test(location.search)) {
-    // Preserve independently authorized Calendar/Drive scopes.
-    window.OnixAccounts.disconnect("gmail");
-  } else gmailClient.disconnect();
-  gmailStatusEl.textContent = "Gmail desconectado. Calendar y Drive conservan sus permisos si estaban conectados.";
+  gmailClient.disconnect();
+  gmailStatusEl.textContent = "Gmail desconectado de esta sesión.";
   gmailWelcomeStatus.textContent = "Gmail desconectado. Conecta cuando quieras.";
   renderConns();
 });
@@ -1395,6 +1357,7 @@ $("#gmailDisconnect").addEventListener("click", () => {
 function applyProfile(p) {
   p = p || window.OnixAccounts?.profile();
   C.owner = window.OnixAccounts?.callName() || p?.name || "";
+  refreshProjectNames();
   const admin = !window.OnixAccounts || window.OnixAccounts.isAdmin();
   document.querySelectorAll("[data-admin-only]").forEach(e => { e.hidden = !admin; });
   if (!window.OnixAccounts?.isAdmin()) { projects = []; renderProjects(); }

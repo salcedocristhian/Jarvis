@@ -161,7 +161,7 @@ const SH = {
     return { cx:W/2, cy:r.cy, spin:0, rate:0, pitch:0, links, at:s => P[s], col:() => 0, al:s => A[s] };
   },
   derm: () => {
-    const [gx, g0] = ground(), gy = g0 - H*.08, S = Math.min(W*.5, 320), P = [], A = [], C = [], links = [];
+    const [gx, g0] = ground(), gy = g0 - H*.08, S = Math.min(W*.42, 320), P = [], A = [], C = [], links = [];
     const add = (pts, closed, al, col = 0) => { const s = P.length; pts.forEach(q => { P.push([q[0]*S, q[1]*S, q[2]*S]); A.push(al); C.push(col); });
       for(let j = 0; j < pts.length - (closed ? 0 : 1); j++) links.push([s + j, s + (j + 1) % pts.length, al]); };
     const line = (a, b, n) => Array.from({length:n}, (_, j) => { const u = j/(n - 1); return [a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u, a[2] + (b[2] - a[2])*u]; });
@@ -529,8 +529,77 @@ async function list(items = []){
 }
 function hideList(){ listLabs.forEach(e => fadeOut(e, 180)); listLabs = []; }
 
+/* ---------- project scenes: the orb becomes the building, the treatment train, the site ---------- */
+let sceneLabs = [], sceneFollow = [], flow = null;
+function onScreen(sh, x, y, z){ return project(x*sh.S, y*sh.S, z*sh.S, sh.cx, sh.cy, sh.yaw0 || 0, sh.pitch); }
+function sceneLabel(cls, title, sub){ const e = label(cls, "<b></b><span></span>"); e.querySelector("b").textContent = title || ""; e.querySelector("span").textContent = sub || ""; sceneLabs.push(e); return e; }
+function follow(fn){ sceneFollow.push(fn); followers.push(fn); }
+async function clearScene(){
+  sceneLabs.forEach(e => fadeOut(e, 180)); sceneLabs = [];
+  followers = followers.filter(f => !sceneFollow.includes(f)); sceneFollow = [];
+  marks = []; clearInterval(flow); flow = null;
+  await tween(e => { spot.k = Math.min(spot.k, 1 - e); }, 400);
+}
+// floorName: the floor to light up, e.g. "Piso 2". note: { title, sub } next to it.
+async function tower(floorName, note = {}){
+  await clearScene();
+  if(!DATA.tower) return false;
+  const hot = DATA.tower.floors.findIndex(f => f[0] === floorName);
+  const forming = become("tower", hot, 1400);
+  tween(e => spot.k = e, 900);
+  if(hot >= 0 && note.title){
+    const lab = sceneLabel("side", note.title, note.sub);
+    follow(() => { const sh = cur; if(sh.name !== "tower") return; let best = null, left = null;
+      for(let j = 0; j < sh.per; j++){ const p = pts[inv[sh.hot*sh.per + j]]; if(!best || p.X > best.X) best = p; if(!left || p.X < left.X) left = p; }
+      const lw = lab.offsetWidth || 110; let x = best.X + 14; if(x + lw > W - 12) x = Math.max(12, left.X - 14 - lw);
+      lab.style.left = x + "px"; lab.style.top = best.Y + "px"; });
+    forming.then(() => show(lab));
+  }
+  await forming; return true;
+}
+// stages: [[key, x, y, title, sub]], shown one by one every stepMs. The last one is the stop valve.
+async function derm(stages, stepMs = 1300){
+  await clearScene();
+  const sh = await become("derm", null, 1400);
+  tween(e => spot.k = e, 800);
+  const labs = stages.map(([k, x, y, a, b], i) => { const el = sceneLabel((i === stages.length - 1 ? "valve " : "") + (y < 0 ? "day" : ""), a, b);
+    follow(() => { if(cur !== sh) return; const p = onScreen(sh, x, y, 0), hw = (el.offsetWidth || 90)/2 + 8; el.style.left = clamp(p[0], hw, W - hw) + "px"; el.style.top = p[1] + "px"; }); return el; });
+  const start = () => onScreen(sh, -1.02, .05, 0), stop = () => onScreen(sh, .8, .05, 0);
+  if(!RM) flow = setInterval(() => { if(cur !== sh) return; const [fx, fy] = start(); msgs.push({ fx, fy, to:stop, t0:performance.now(), dur:T(1500), bend:0, onLand:null }); }, 110);
+  for(const [i, el] of labs.entries()){ show(el); if(i === labs.length - 1) kick = .6; await sleep(stepMs); }
+  return true;
+}
+// Barcelona: every NV5 mark flies to its spot; the building with the most lights up.
+async function site(){
+  await clearScene();
+  if(!DATA.site) return null;
+  const sh = await become("site", null, 1300);
+  tween(e => spot.k = e, 700);
+  marks = DATA.site.marks.map(m => ({ x:m[0], y:m[1], z:m[2], b:m[3], f:m[4], on:false, flash:0 }));
+  const counter = sceneLabel("", "0", "repair marks"), cb = counter.querySelector("b"); let n = 0;
+  counter.style.left = (W/2) + "px"; counter.style.top = Math.max(80, sh.cy - sh.S*.95) + "px"; show(counter);
+  marks.forEach((m, i) => {
+    const to = () => project(m.x*sh.S, m.y*sh.S*sh.EX, m.z*sh.S, sh.cx, sh.cy, rot, sh.pitch);
+    if(RM){ m.on = true; n = marks.length; cb.textContent = n; return; }
+    msgs.push({ fx:sh.cx, fy:sh.cy - H*.28, to, t0:performance.now() + T(i*14), dur:T(750), bend:(Math.random() - .5)*120, onLand:() => { m.on = true; m.flash = 1; cb.textContent = ++n; } });
+  });
+  await sleep(marks.length*14 + 800);
+  const cnt = {}; marks.forEach(m => cnt[m.b] = (cnt[m.b] || 0) + 1);
+  const top = Object.keys(cnt).filter(b => b !== "club").sort((a, b) => cnt[b] - cnt[a])[0];
+  if(top && cur === sh){
+    sh.hot = top; tween(e => sh.hotK = e, 700);
+    const loop = DATA.site.loops.find(l => l.b === top);
+    const lab = sceneLabel("", `Building ${top} · ${cnt[top]}`, "NV5 marks");
+    if(loop) follow(() => { if(cur !== sh) return; const c = loop.pts.reduce((a, q) => [a[0] + q[0]/loop.pts.length, a[1] + q[1]/loop.pts.length], [0, 0]);
+      const p = project(c[0]*sh.S, loop.h*sh.EX*sh.S, c[1]*sh.S, sh.cx, sh.cy, rot, sh.pitch); lab.style.left = p[0] + "px"; lab.style.top = Math.max(p[1] + 40, sh.cy + sh.S*.42) + "px"; });
+    show(lab);
+  }
+  return { total:marks.length, byBuilding:cnt, top };
+}
+function setData(k, v){ DATA[k] = v; }
+
 return {
-  become, week, hideWeek, list, hideList, sleep, tween, show, label, send, clearSubs, trio, hideTrio, bigIcon, hideIcon, nameplate, hideName, choose, ask, tapToStart, confirmButton,
+  become, week, hideWeek, list, hideList, tower, derm, site, clearScene, setData, sleep, tween, show, label, send, clearSubs, trio, hideTrio, bigIcon, hideIcon, nameplate, hideName, choose, ask, tapToStart, confirmButton,
   say: (text, o = {}) => speak(aEl, text, { rate:1, ...o }),
   echo: text => speak(qEl, text, { rate:1.2, own:false }),
   setVoice(v){ voice = Math.max(0, Math.min(1, Number(v) || 0)); },
