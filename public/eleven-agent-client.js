@@ -27,7 +27,7 @@
     if (/ai|agent|assistant/.test(source)) return "agent";
     return "";
   }
-  async function start({ clientTools = {}, onConnect, onDisconnect, onMessage, onModeChange, onError } = {}) {
+  async function start({ clientTools = {}, dynamicVariables, signedUrl, onConnect, onDisconnect, onMessage, onModeChange, onError } = {}) {
     if (session || connecting) return session;
     connecting = true;
     try {
@@ -39,9 +39,11 @@
       const { Conversation } = await sdk();
       if (!Conversation?.startSession) throw new Error("No pude cargar el cliente de ElevenAgents.");
       const pending = await Conversation.startSession({
-        agentId: AGENT_ID,
+        // A private link from the ÓNIX server when it is set up; otherwise the public agent ID.
+        ...(signedUrl ? { signedUrl } : { agentId: AGENT_ID }),
         connectionType: "websocket",
         clientTools,
+        ...(dynamicVariables ? { dynamicVariables } : {}),
         onConnect: info => onConnect?.(info),
         onDisconnect: info => { session = null; onDisconnect?.(info); },
         onMessage: msg => onMessage?.({ text: getMessageText(msg), speaker: getSpeaker(msg), original: msg }),
@@ -58,6 +60,13 @@
     session = null;
     await current.endSession();
   }
+  // Quiet information for the agent (an action's result) that doesn't count as the person speaking.
+  function context(text) {
+    if (!session) return false;
+    const t = String(text).slice(0, 800);
+    if (typeof session.sendContextualUpdate === "function") session.sendContextualUpdate(t); else session.sendUserMessage("SYSTEM NOTE: " + t);
+    return true;
+  }
   function send(text) {
     if (!session) return false;
     session.sendUserMessage(String(text).slice(0, 1500));
@@ -72,7 +81,7 @@
     try { const d = session?.getOutputByteFrequencyData?.(); return d && d.length ? d : null; } catch { return null; }
   }
   window.JarvisElevenAgent = Object.freeze({
-    start, stop, send, preload, level, bands, get connected() { return !!session; },
+    start, stop, send, context, preload, level, bands, get connected() { return !!session; },
     get connecting() { return connecting; }, id: AGENT_ID
   });
 })();

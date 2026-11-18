@@ -1,20 +1,31 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#04070C">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Una</title>
+<title>ÓNIX</title>
+<link rel="manifest" href="./onix.webmanifest">
+<link rel="apple-touch-icon" href="./public/onix-180.png">
+<meta name="apple-mobile-web-app-title" content="ÓNIX">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 fill=%22%2304070C%22/%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%2218%22 fill=%22none%22 stroke=%22%2393D0F0%22 stroke-width=%223%22/%3E%3Ccircle cx=%2248%22 cy=%2220%22 r=%223%22 fill=%22%23C9A35C%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Unbounded:wght@600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./public/jarvis-explorer.css">
 <link rel="stylesheet" href="./public/jarvis-motion.css">
+<link rel="stylesheet" href="./public/onix.css">
 <link rel="stylesheet" href="./public/master-hub.css">
 <script src="./public/master-hub.js" defer></script>
+<style>
+/* ÓNIX home: the orb layer replaces the old background and orb; answers from the old reel still appear on top. */
+.onx-home{position:fixed;inset:0;z-index:0;background:var(--ink)}
+body.onix #bg, body.onix .core{visibility:hidden}
+body.onix main{pointer-events:none}
+body.onix .reel{pointer-events:auto}
+</style>
 <style>
 :root{
   --ink:#04070C; --deep:#0A1A30; --line:#1F3D5E; --mesh:#3F7DB5;
@@ -176,9 +187,9 @@ body.docked .heard{font-size:13px;margin-top:4px}
 <script>
 // Marca y preferencias editables. Cambia el nombre aquí y en todo el producto cambia.
 window.UNA_CONFIG = {
-  name: "Una",
-  owner: "Chris",
-  lang: "es-US",            // idioma del micrófono y de la voz del navegador
+  name: "ÓNIX",
+  owner: "",               // filled from the signed-in account
+  lang: "en-US",            // idioma del micrófono y de la voz del navegador
   silenceMs: 1100,          // pausa que cuenta como “terminé de hablar”
   greet: true               // saludo hablado al primer toque
 };
@@ -189,11 +200,11 @@ window.UNA_CONFIG = {
 <canvas id="bg" aria-hidden="true"></canvas>
 
 <header class="chrome">
-  <button class="tiny" id="menuBtn" type="button" aria-label="Menú" aria-haspopup="dialog">
+  <button class="tiny" id="menuBtn" type="button" aria-label="Menu" aria-haspopup="dialog">
     <svg viewBox="0 0 24 24"><path d="M5 9h14M5 15h9"/></svg>
   </button>
   <span class="demo sr" id="demoTag" hidden>DEMO</span>
-  <button class="tiny" id="setBtn" type="button" aria-label="Ajustes" aria-haspopup="dialog">
+  <button class="tiny" id="setBtn" type="button" aria-label="Settings" aria-haspopup="dialog">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8" stroke-dasharray="2.2 3.1"/></svg>
   </button>
 </header>
@@ -243,33 +254,36 @@ window.UNA_CONFIG = {
 
 <dialog class="sheet" id="menu" aria-label="Menú">
   <div class="grab"></div>
-  <h2>Proyectos.</h2>
+  <h2>Projects.</h2>
   <div id="projList" class="plist"></div>
-  <h2>Hoy.</h2>
-  <div id="hist" class="hist"><p class="muted">Todavía no han hablado.</p></div>
+  <h2>Today.</h2>
+  <div id="hist" class="hist"><p class="muted">Nothing yet today.</p></div>
   <h2>Conexiones.</h2>
   <ul id="conns" class="conns"></ul>
 </dialog>
 
 <dialog class="sheet" id="settings" aria-label="Ajustes">
   <div class="grab"></div>
-  <h2>Ajustes.</h2>
-  <label class="opt">Voz
+  <h2>Settings.</h2>
+  <h2>Your accounts.</h2>
+  <p class="muted small">Connect, reconnect, lock or ask Chris for a new connection.</p>
+  <div class="btnrow"><button class="btn primary" type="button" id="onixConnections">Connections</button><button class="btn ghost" type="button" id="onixReplay">Replay the welcome</button></div>
+  <label class="opt">Voice
     <select id="optVoice"><option value="agent">ElevenAgents · conversación (sin API Key)</option><option value="eleven">ElevenLabs TTS · llave personal</option><option value="browser">Del navegador</option><option value="off">Silencio (solo texto)</option></select>
   </label>
-  <label class="opt">Idioma
+  <label class="opt">Language
     <select id="optLang"><option value="es-US">Español</option><option value="en-US">English</option></select>
   </label>
-  <label class="opt">Movimiento
-    <select id="optMotion"><option value="full">Completo</option><option value="calm">Calmado</option></select>
+  <label class="opt">Motion
+    <select id="optMotion"><option value="full">Full</option><option value="calm">Calm</option></select>
   </label>
   <h2>Conexiones.</h2>
   <p class="muted small">La voz ElevenAgents funciona sin llave. Para ver datos privados de JobTread, debes autorizar esta sesión en cada navegador (Grant Key).</p>
   <div class="keys">
     <label class="opt col">Llave de Claude<input id="kClaude" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
     <label class="opt col">Modelo<input id="kModel" autocomplete="off"></label>
-    <label class="opt col">Grant key de JobTread<input id="kJob" type="password" autocomplete="off"></label>
-    <label class="opt col">Proyectos fijos<input id="kPins" autocomplete="off" placeholder="id|Nombre,id|Nombre"></label>
+    <label class="opt col" data-admin-only>Grant key de JobTread<input id="kJob" type="password" autocomplete="off"></label>
+    <label class="opt col" data-admin-only>Proyectos fijos<input id="kPins" autocomplete="off" placeholder="id|Nombre,id|Nombre"></label>
     <label class="opt col">Llave de ElevenLabs TTS (opcional; no necesaria con ElevenAgents)<input id="kEleven" type="password" autocomplete="off"></label>
     <label class="opt col">Voice ID para TTS manual (opcional)<input id="kVoice" autocomplete="off"></label>
   </div>
@@ -284,15 +298,6 @@ window.UNA_CONFIG = {
   </div>
   <p class="muted small" id="gmailStatus">No conectado. Requiere OAuth Client ID web, Gmail API habilitada y autorización de Google. No guarda tokens entre sesiones.</p>
   <p class="muted small">En <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noopener noreferrer">Google Cloud · Clients</a>, registra el origen <b>https://salcedocristhian.github.io</b> para un cliente OAuth de tipo Web. Configura la pantalla de consentimiento y tu usuario de prueba si corresponde.</p>
-  <details id="webResearchSettings">
-    <summary>Internet con Gemini · configuración privada</summary>
-    <p class="muted small">Investigación pública con Google Search. La llave de Gemini se mantiene en Cloudflare, nunca aquí. El acceso de este teléfono solo permanece en memoria durante la pestaña abierta.</p>
-    <label class="opt col">Token de acceso privado al servicio de Jarvis
-      <input id="webResearchToken" type="password" autocomplete="off" placeholder="Acceso privado del Worker (no Gemini API key)">
-    </label>
-    <div class="btnrow"><button class="btn ghost" type="button" id="webResearchConnect">Activar investigación</button><button class="btn ghost" type="button" id="webResearchDisconnect">Desactivar</button></div>
-    <p class="muted small" id="webResearchStatus" role="status">Pendiente de configurar el servicio privado en Cloudflare.</p>
-  </details>
   <div class="btnrow"><button class="btn primary" type="button" id="testBtn">Probar conexiones</button><button class="btn ghost" type="button" id="forget">Borrar llaves</button></div>
   <ul class="conns" id="testOut"></ul>
   <p class="muted small">Toca el orbe una vez para iniciar o detener la conversación continua. Mantén presionado para escribir. Desliza hacia abajo para despejar la pantalla.</p>
@@ -303,6 +308,15 @@ window.UNA_CONFIG = {
 <script src="https://accounts.google.com/gsi/client" id="google-identity-services" async defer></script>
 <script src="./public/gmail-readonly.js"></script>
 <script src="./public/web-research.js"></script>
+<script src="./public/onix-config.js"></script>
+<script src="./public/onix-engine.js"></script>
+<script src="./public/onix-accounts.js"></script>
+<script src="./public/onix-onboarding.js"></script>
+<script src="./public/onix-connectors.js"></script>
+<script src="./public/onix-data.js"></script>
+<script src="./public/onix-home.js"></script>
+<script src="./public/onix-tools.js"></script>
+<script src="./public/onix-chat.js"></script>
 <script src="./public/jarvis-explorer.js"></script>
 <script src="./public/jarvis-motion.js"></script>
 <script>
@@ -489,7 +503,6 @@ async function testConnections() {
   const out = $("#testOut"); out.innerHTML = `<li><span class="muted">Probando…</span></li>`; out.scrollIntoView({ block: "end", behavior: "smooth" }); out.innerHTML = "";
   const row = (n, ok, msg) => out.insertAdjacentHTML("beforeend", `<li><span>${n}</span><span class="${ok ? "ok" : "no"}">${esc(msg)}</span></li>`);
   row("ElevenAgents", true, "Configurado sin API Key; toca el orbe para probar la voz");
-  row("Internet (Gemini)", Boolean(window.JarvisWebResearch?.configured), window.JarvisWebResearch?.configured ? "Acceso privado configurado (la búsqueda se verifica al usarla)" : "Por activar en Cloudflare y Ajustes");
   row("Gmail", Boolean(window.JarvisGmail?.connected), window.JarvisGmail?.connected ? "Autorizado por Google en esta sesión" : "Sin autorizar. Pulsa Conectar Gmail con Google");
   if (keys.claude) { try { await claudeCall({ model: keys.model, max_tokens: 5, messages: [{ role: "user", content: "di ok" }] }); row("Claude", true, "Funciona"); } catch (e) { row("Claude", false, e.message); } }
   else row("Claude", false, "Falta la llave");
@@ -1070,14 +1083,18 @@ async function agentGmailRead({ question } = {}) {
   }
 }
 
+// Keep the existing ElevenLabs web_research client tool available alongside ÓNIX's web_search.
+// Research stays opt-in until its private Cloudflare endpoint is configured.
 async function agentWebResearch({ question } = {}) {
   noteRealToolCall();
   const q = String(question || agentLastQuestion || "").trim().slice(0, 600);
   setPhase("thinking", "Investigando fuentes públicas");
-  const result = await webResearch.search({ question: q });
+  const result = webResearch?.search
+    ? await webResearch.search({ question: q })
+    : { ok: false, grounded: false, speech: "La búsqueda web todavía no está configurada.", sources: [] };
   const frames = [{ type: "headline", text: result.ok ? "Investigación web" : "Internet no disponible" }];
   for (const source of result.sources || []) frames.push({ type: "web-source", title: source.title, link: source.url });
-  if (!result.grounded) frames.push({ type: "evidence", title: result.ok ? "Fuentes no verificadas" : "Consulta pendiente", detail: result.ok ? "La respuesta no incluye referencias verificadas de Google Search." : result.speech, source: "Gemini / Cloudflare" });
+  if (!result.grounded) frames.push({ type: "evidence", title: result.ok ? "Fuentes no verificadas" : "Consulta pendiente", detail: result.speech, source: "Investigación web" });
   const out = { speech: result.speech, frames, closer: result.grounded ? "Fuentes públicas · Verifica antes de tomar decisiones." : "No confirmada con fuentes externas." };
   showReel(out);
   timeline.unshift({ q, a: result.speech }); renderHistory();
@@ -1096,15 +1113,36 @@ async function startAgentVoice(optionalQuestion = "") {
   if (!reel.hidden) clearReel();
   setPhase("thinking", "Conectando la voz ElevenAgents…");
   agentLastQuestion = optionalQuestion;
+  const OA = window.OnixAccounts, admin = Boolean(OA?.isAdmin()), server = Boolean(window.OnixChat?.ready()), H = window.OnixHome;
+  if (OA && !admin && !server && OA.budget.left() <= 0) { voiceBudgetSpent(); return; }
+  H?.setState("connecting");
   try {
+    // With the ÓNIX server, voice starts only with its private link, and only while there is budget.
+    let signedUrl = null;
+    if (server) {
+      const permit = await window.OnixChat.permit();
+      if (!permit.ok) { voiceBudgetSpent(permit.reason); return; }
+      signedUrl = permit.signedUrl;
+    }
+    const onixTools = window.OnixTools?.handlers() || { gmail_read: agentGmailRead };
+    const tools = { ...onixTools, web_research: agentWebResearch, ...(admin ? { jobtread_read: agentJobTreadRead } : {}), set_nickname: agentSetNickname };
+    let connectedAt = 0;
     const session = await agentClient.start({
-      clientTools: { jobtread_read: agentJobTreadRead, gmail_read: agentGmailRead, web_research: agentWebResearch },
+      clientTools: tools,
+      dynamicVariables: onixVariables(),
+      signedUrl,
       onConnect: () => {
+        connectedAt = Date.now();
+        H?.setState("listening");
+        if (server) startServerMeter(); else if (OA && !admin) startVoiceMeter();
         talking = true; handsfreeSessionStarted = true;
         document.body.classList.add("talking"); setPhase("listening", "Escuchando continuamente · micrófono activo");
         renderHandsfree(); renderConns();
       },
       onDisconnect: () => {
+        stopVoiceMeter();
+        if (connectedAt && Date.now() - connectedAt > 45000) { try { localStorage.setItem("una.onix.recon", "1"); } catch {} }
+        H?.setState("idle");
         talking = false; handsfreeSessionStarted = false;
         document.body.classList.remove("talking");
         setPhase("idle", handsfreePreferred ? "Escucha pausada · pulsa Reanudar" : "Toca para hablar");
@@ -1112,22 +1150,23 @@ async function startAgentVoice(optionalQuestion = "") {
       },
       onModeChange: m => {
         const mode = String(m?.mode || m || "");
-        if (mode === "speaking") setPhase("speaking", "Jarvis respondiendo · micrófono activo");
-        else if (mode === "listening") setPhase("listening", "Escuchando continuamente · micrófono activo");
+        if (mode === "speaking") setPhase("speaking", "ÓNIX talking · mic on");
+        else if (mode === "listening") setPhase("listening", "Listening · mic on");
+        if (mode === "speaking" || mode === "listening") H?.setState(mode);
         reel.dataset.voice = mode;
       },
       onMessage: m => {
         if (!m?.text) return;
-        if (m.speaker === "user") { agentLastQuestion = m.text; heardEl.textContent = m.text; }
+        if (m.speaker === "user") { agentLastQuestion = m.text; heardEl.textContent = m.text; H?.heard(m.text); }
         else if (m.speaker === "agent") {
           if (handleLeakedToolCode(m.text)) return;
           agentResponseSequence++;
-          heardEl.textContent = m.text;
+          heardEl.textContent = m.text; H?.reply(m.text);
           if (!reel.hidden) return;
           timeline.unshift({ q: agentLastQuestion, a: m.text }); renderHistory();
         }
       },
-      onError: e => { stateEl.textContent = agentErrorMessage(e); },
+      onError: e => { stateEl.textContent = agentErrorMessage(e); H?.reply(agentErrorMessage(e), { rate: 1 }); },
     });
     if (document.hidden && session) {
       // A tab may become hidden while the asynchronous SDK initializes.
@@ -1139,6 +1178,7 @@ async function startAgentVoice(optionalQuestion = "") {
   } catch (e) {
     talking = false; document.body.classList.remove("talking");
     const msg = agentErrorMessage(e);
+    if (H?.mounted) { H.setState("idle"); H.reply(msg, { rate: 1 }); setPhase("idle", msg); handsfreeSessionStarted = false; renderHandsfree(); return; }
     showReel({ speech: msg, frames: [{ type: "headline", text: "Voz ElevenAgents no disponible." },
       { type: "evidence", title: msg, source: "Revisa conexión del navegador" }] });
     setPhase("idle", msg);
@@ -1146,6 +1186,54 @@ async function startAgentVoice(optionalQuestion = "") {
     renderHandsfree();
   }
 }
+/* ---------- ÓNIX: who is talking, and how much premium voice they have left ---------- */
+function onixVariables() {
+  const OA = window.OnixAccounts, p = OA?.profile() || {};
+  return {
+    user_name: OA?.callName() || "there",
+    user_email: p.email || "unknown",
+    user_role: OA?.isAdmin() ? "admin" : "guest",
+    connector_requests: (OA?.requests() || []).join(", ") || "none",
+    voice_seconds_left: OA?.isAdmin() ? -1 : OA?.budget.left() ?? 0,
+    first_conversation: (() => { try { return localStorage.getItem("una.onix.recon") === "1" ? "no" : "yes"; } catch { return "no"; } })(),
+    today: new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }),
+    time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone
+  };
+}
+let voiceMeter = 0;
+function startVoiceMeter() {
+  stopVoiceMeter();
+  voiceMeter = setInterval(() => {
+    const OA = window.OnixAccounts; if (!OA) return;
+    OA.budget.add(1);
+    if (OA.budget.left() <= 0) { stopAgentVoice(); voiceBudgetSpent(); }
+  }, 1000);
+}
+// Client tool: "call me Doug". Saves only on this phone; no email or account changes.
+async function agentSetNickname({ nickname } = {}) {
+  const OA = window.OnixAccounts; if (!OA?.profile()) return "Nobody is signed in on this phone.";
+  const name = OA.setNickname(nickname);
+  applyProfile();
+  return name ? `Saved. From now on, call them ${name}.` : "That name didn't work. Ask again.";
+}
+function stopVoiceMeter() { clearInterval(voiceMeter); voiceMeter = 0; }
+// With the ÓNIX server: report every 15 s; the server says when the budget is gone.
+function startServerMeter() {
+  stopVoiceMeter();
+  voiceMeter = setInterval(() => {
+    window.OnixChat.used(15).then(d => { if (d.secondsLeft === 0) { stopAgentVoice(); voiceBudgetSpent("day"); } }).catch(() => {});
+  }, 15000);
+}
+function voiceBudgetSpent(reason) {
+  const chat = Boolean(window.OnixChat?.ready());
+  const line = (reason === "month" ? "The fancy voice is used up for the month. Chris is cheap. " : "That's all the fancy voice I get today. Chris is cheap. ")
+    + (chat ? "Hold the orb and type to me. That part's free." : "Come back tomorrow.");
+  setPhase("idle", line); heardEl.textContent = line;
+  const H = window.OnixHome;
+  if (H?.mounted) { H.setState("idle"); H.reply(line, { rate: 1 }); H.freeVoice(line); }
+  else { try { const u = new SpeechSynthesisUtterance(line); u.lang = "en-US"; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch {} }
+}
+
 async function stopAgentVoice() {
   agentPendingRead++;
   clearTimeout(agentPseudoToolTimer); agentPseudoToolTimer = null;
@@ -1204,11 +1292,14 @@ function openTyper() { $("#typer").hidden = false; $("#typeIn").focus(); }
 function closeTyper() { $("#typer").hidden = true; }
 $("#typer").addEventListener("submit", e => {
   e.preventDefault(); const q = $("#typeIn").value.trim(); if (!q) return;
-  $("#typeIn").value = ""; closeTyper(); unlockAudio(); stopListening(); if (useAgentVoice()) startAgentVoice(q); else turn(q);
+  $("#typeIn").value = ""; closeTyper(); unlockAudio(); stopListening();
+  if (window.OnixChat?.ready() && !agentClient?.connected) { window.OnixChat.talk(q); return; }
+  if (useAgentVoice()) startAgentVoice(q); else turn(q);
 });
 
 /* ---------------- hojas: menú y ajustes ---------------- */
 function openSheet(id) { const d = $("#" + id); if (!d.open) d.showModal(); }
+function closeSheets() { document.querySelectorAll("dialog[open]").forEach(d => d.close()); }
 $("#menuBtn").addEventListener("click", () => openSheet("menu"));
 $("#setBtn").addEventListener("click", () => openSheet("settings"));
 document.querySelectorAll("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
@@ -1276,19 +1367,6 @@ async function connectGmailFromButton() {
     renderConns();
   }
 }
-const webStatus = $("#webResearchStatus");
-$("#webResearchConnect").addEventListener("click", () => {
-  try {
-    webResearch.configure($("#webResearchToken").value);
-    $("#webResearchToken").value = "";
-    webStatus.textContent = webResearch.configured ? "Acceso configurado solo para esta pestaña. Haz una pregunta de actualidad al orbe." : "Acceso vacío; sigue desactivado.";
-  } catch (e) { webStatus.textContent = e.message; }
-});
-$("#webResearchDisconnect").addEventListener("click", () => {
-  webResearch.configure("");
-  $("#webResearchToken").value = "";
-  webStatus.textContent = "Investigación desactivada para esta pestaña.";
-});
 gmailSettingsConnect.addEventListener("click", connectGmailFromButton);
 gmailWelcomeConnect.addEventListener("click", connectGmailFromButton);
 $("#gmailWelcomeSkip").addEventListener("click", () => gmailWelcome.close());
@@ -1298,6 +1376,45 @@ $("#gmailDisconnect").addEventListener("click", () => {
   gmailWelcomeStatus.textContent = "Gmail desconectado. Conecta cuando quieras.";
   renderConns();
 });
+/* ---------- ÓNIX launch: Microsoft return trip, first-time welcome, or one-tap reconnect ---------- */
+function applyProfile(p) {
+  p = p || window.OnixAccounts?.profile();
+  C.owner = window.OnixAccounts?.callName() || p?.name || "";
+  const admin = !window.OnixAccounts || window.OnixAccounts.isAdmin();
+  document.querySelectorAll("[data-admin-only]").forEach(e => { e.hidden = !admin; });
+  if (!window.OnixAccounts?.isAdmin()) { projects = []; renderProjects(); }
+  else if (!projects.length) boot();
+  renderConns();
+}
+async function onixLaunch() {
+  const OA = window.OnixAccounts, OB = window.OnixOnboarding;
+  if (!OA || !OB || /[?&]classic\b/.test(location.search)) return showGmailWelcomeOnLaunch();
+  applyProfile();
+  const back = await OA.handleRedirect();
+  if (back) {
+    if (/^onboard-/.test(back.resume || "")) { OB.resume(back, { onDone: p => { applyProfile(p); startHome(false); } }); return; }
+    applyProfile(back.profile); startHome(false);
+    if (back.resume === "connectors" || back.error) window.OnixConnections?.open(back.error || "Microsoft is connected.");
+    return;
+  }
+  if (!OA.onboarded()) { OB.start({ onDone: p => { applyProfile(p); startHome(false); } }); return; }
+  const asked = await OB.reconnect({ onDone: p => { applyProfile(p); startHome(Boolean(p)); } });
+  if (!asked) startHome(true);
+}
+// The orb becomes the main screen. brief = say what's new with real numbers.
+function startHome(brief) {
+  const H = window.OnixHome; if (!H) return;
+  if (!H.mounted) {
+    H.mount({ onTap: () => orb.click(), onHold: () => openTyper() });
+    document.body.classList.add("onix");
+    $("#typeIn").placeholder = "Type to ÓNIX"; $("#orb").setAttribute("aria-label", "Talk to ÓNIX");
+  }
+  if (brief) setTimeout(() => H.brief().catch(() => {}), 900);
+}
+window.addEventListener("onix:restart-welcome", () => { closeSheets(); window.OnixOnboarding?.start({ onDone: p => { applyProfile(p); startHome(false); } }); });
+window.addEventListener("onix:connections-changed", () => applyProfile());
+$("#onixConnections").addEventListener("click", () => { closeSheets(); window.OnixConnections?.open(); });
+$("#onixReplay").addEventListener("click", () => { closeSheets(); window.OnixOnboarding?.start({ onDone: p => { applyProfile(p); startHome(false); } }); });
 function showGmailWelcomeOnLaunch() {
   if (!gmailClient?.connected && !gmailWelcome.open && !/\bnoGmailPrompt=1\b/.test(location.search)) {
     gmailWelcome.showModal();
@@ -1422,7 +1539,8 @@ async function boot() {
   status = { agent: "ready", gmail: gmailClient?.connected ? "connected" : "not_connected", claude: keys.claude ? "connected" : "not_connected", jobtread: keys.jobtread ? "connected" : "not_connected", elevenlabs: keys.eleven && keys.voiceId ? "connected" : "not_connected", outlook: "not_connected" };
   $("#demoTag").hidden = !demo;
   renderConns();
-  try { projects = demo ? DEMO_PROJECTS : keys.jobtread ? await loadDirectProjects() : []; }
+  const seesProjects = !window.OnixAccounts || window.OnixAccounts.isAdmin(); // guests never see Chris's projects or JobTread
+  try { projects = !seesProjects ? [] : demo ? DEMO_PROJECTS : keys.jobtread ? await loadDirectProjects() : []; }
   catch (e) { projects = []; stateEl.textContent = "JobTread: " + e.message; }
   if (!demo && keys.jobtread && !keys.claude && projects.length) stateEl.textContent = "JobTread listo · pregunta por tus proyectos";
   renderProjects();
@@ -1430,7 +1548,7 @@ async function boot() {
 }
 setPhase("idle"); renderHandsfree(); renderHistory(); // Preload the ElevenAgents JavaScript in the background: no microphone or conversation starts here.
 agentClient?.preload?.().catch(() => {});
-showGmailWelcomeOnLaunch(); boot();
+onixLaunch().finally(boot);
 })();
 
 </script>

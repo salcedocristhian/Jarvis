@@ -1,8 +1,8 @@
 {
-  "name": "una",
+  "name": "onix",
   "version": "0.1.0",
   "private": true,
-  "description": "Una: asistente personal por voz. Orbe, motion graphics y conectores (JobTread, Claude, ElevenLabs).",
+  "description": "ÓNIX: asistente personal por voz. Orbe, motion graphics, cuentas propias (Google/Microsoft) y ElevenAgents.",
   "type": "module",
   "engines": {
     "node": ">=18.17"
@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "check": "node --check server.js && node --check public/app.js && node --check public/config.js",
-    "test": "node test/smoke.mjs && node test/jobtread-direct.mjs && node test/server-direct.mjs && node test/elevenagents.mjs && node test/gmail-readonly.mjs && node test/project-search.mjs && node test/agent-tool-guard.mjs && node test/handsfree.mjs && node test/explorer-motion.mjs && node test/motion-v2.mjs && node test/research.mjs && node test/master-hub.mjs"
+    "check": "node --check server.js && node --check public/app.js && node --check public/config.js && node --check public/onix-engine.js && node --check public/onix-accounts.js && node --check public/onix-onboarding.js && node --check public/onix-connectors.js && node --check public/onix-config.js && node --check public/onix-data.js && node --check public/onix-home.js && node --check public/onix-tools.js && node --check public/onix-chat.js && node --check worker/onix-worker.js",
+    "test": "node test/smoke.mjs && node test/jobtread-direct.mjs && node test/server-direct.mjs && node test/elevenagents.mjs && node test/gmail-readonly.mjs && node test/project-search.mjs && node test/agent-tool-guard.mjs && node test/handsfree.mjs && node test/explorer-motion.mjs && node test/motion-v2.mjs && node test/onix-accounts.mjs && node test/onix-data.mjs && node test/onix-worker.mjs && node test/master-hub.mjs && node test/research.mjs"
   }
 }

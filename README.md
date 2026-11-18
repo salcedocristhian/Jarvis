@@ -170,8 +170,3 @@ Además: mandala detrás del orbe mientras Jarvis consulta, y el anillo del orbe
 **Estudio.** `motion-lab.html` es la galería de todas las animaciones con datos de ejemplo (DEMO).
 
 La variante `servidor/` mantiene su interfaz anterior; Motion V3 vive en la app publicada (`index.html`).
-
-
-## Investigación pública con Gemini (opcional)
-
-Jarvis incluye un bridge privado para consultar Google Search desde el orbe y mostrar enlaces verificables. No se publica una Gemini API key en el navegador ni se envían mensajes privados a una búsqueda pública. **No está activo hasta desplegar y configurar el Worker de Cloudflare**. Ver [docs/RESEARCH-SETUP.md](docs/RESEARCH-SETUP.md).

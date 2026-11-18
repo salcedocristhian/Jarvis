@@ -146,8 +146,17 @@
     accessToken = ""; expiresAt = 0; activeClient = "";
     if (token && scope.google?.accounts?.oauth2?.revoke) scope.google.accounts.oauth2.revoke(token, () => {});
   }
+  // ÓNIX signs in once for Gmail, Calendar and Drive and hands the same short-lived token here.
+  function adopt(token, expiresIn) {
+    if (typeof token !== "string" || !token) return false;
+    accessToken = token; activeClient = "onix";
+    expiresAt = Date.now() + Math.min(Number(expiresIn) || 3600, 3600) * 1000;
+    return true;
+  }
+  // Drop the token from memory without revoking it (Calendar and Drive may still use the same grant).
+  function forget() { accessToken = ""; expiresAt = 0; activeClient = ""; }
   scope.JarvisGmail = Object.freeze({
-    connect, messages, readMessage, disconnect, isClientId,
+    connect, messages, readMessage, disconnect, isClientId, adopt, forget,
     get connected() { return ready(); },
     get clientId() { return activeClient; }
   });
