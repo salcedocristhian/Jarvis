@@ -101,13 +101,13 @@ Esto cuida tus minutos de verdad y activa la IA gratis y la búsqueda web. Todo 
    - *KV namespace*: Variable name `ONIX_KV`, namespace `ONIX_KV`.
    - *Workers AI*: Variable name `AI`.
 5. **Settings → Variables and secrets → Add → Secret**:
-   - `ELEVENLABS_API_KEY`: en ElevenLabs → Developers → API Keys, crea una llave solo con permiso de ElevenAgents/Conversational AI.
+   - `ELEVENLABS_API_KEY`: en ElevenLabs → Developers → API Keys, crea una llave privada con permisos de lectura de ElevenAgents/Conversational AI **y Text to Speech**. Este último permiso es necesario para que el saludo y el resumen tengan la misma voz del agente.
    - `BRAVE_API_KEY` (opcional, búsqueda web): [api-dashboard.search.brave.com](https://api-dashboard.search.brave.com/). Pon el límite de gasto en $0.
    - `GEMINI_API_KEY` (opcional, respaldo de IA): [aistudio.google.com](https://aistudio.google.com/apikey). Nunca recibe correos ni calendario.
    El servidor usa la misma voz y modelo de tu agente automáticamente (para otra voz, agrega la variable `VOICE_ID`).
    Los límites (60 s al día por invitado, 6000 s al mes para invitados, 80 mensajes de texto al día) ya vienen en el código; para cambiarlos agrega *Variables* con los nombres de `wrangler.toml`.
 6. Abre `https://onix.TU-SUBDOMINIO.workers.dev/health`. Debe decir `"ok":true,"kv":true,"ai":true,"voice":true`.
-7. Pega esa dirección (sin `/health`) en `public/onix-config.js` → `worker.url`, súbelo a GitHub y prueba la voz.
+7. Pega esa dirección (sin `/health`) en `public/onix-config.js` → `worker.url`, súbelo a GitHub y prueba la voz. Hasta que exista una URL real y `"voice":true` en `/health`, la app usará la voz del navegador para saludos y resúmenes. Cuando funcione el Worker, ElevenLabs tendrá prioridad y el navegador será respaldo automático si el servicio falla o agota su cuota.
 8. Cuando la voz funcione con el servidor, activa la seguridad del agente (paso 4d).
 
 Si prefieres terminal: `cd worker && npx wrangler kv namespace create ONIX_KV`, pega el id en `wrangler.toml`, `npx wrangler secret put ELEVENLABS_API_KEY` y `npx wrangler deploy`.

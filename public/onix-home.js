@@ -1,7 +1,7 @@
 /* ÓNIX home: the orb and the mesh as the main screen.
    - Tap the orb to talk, hold it to type.
    - Answers turn into the data: a week rises from the mesh, emails and files become cards.
-   - The morning brief uses the phone's free voice and only real numbers.
+   - The morning brief uses ElevenLabs when available, with the phone as backup.
    - Every send or RSVP waits on screen for approval, then gives a few seconds to undo. */
 (function (scope) {
   "use strict";

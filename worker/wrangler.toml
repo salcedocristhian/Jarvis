@@ -13,7 +13,7 @@ id = "PASTE_THE_KV_ID_HERE"   # npx wrangler kv namespace create ONIX_KV
 [vars]
 ALLOWED_ORIGIN = "https://salcedocristhian.github.io"
 AGENT_ID = "agent_9601m7c4t540fh6v6nadake0hsrp"
-ADMIN_HASHES = "192415de7da4a638b541cfd10a9ae75cd79a2d52463f27ee4bfa0629cb4565f2"
+ADMIN_HASHES = "192415de7da4a638b541cfd10a9ae75cd79a2d52463f27ee4bfa0629cb4565f2,27fba9e0eb60ca1e4d5e58362271243c9597f8aa7273a68a1ad9f554faa47472"
 GUEST_DAILY_SECONDS = "60"
 GUEST_MONTH_SECONDS = "6000"
 ASK_DAILY = "80"

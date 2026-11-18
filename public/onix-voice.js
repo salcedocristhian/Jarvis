@@ -19,8 +19,8 @@
   // iPhones only play sound after a touch. Call this inside the first tap.
   let unlocked = false;
   function unlock(){
-    if(unlocked) return; unlocked = true;
-    try { if(audio){ audio.src = SILENT; audio.play().catch(() => {}); } } catch {}
+    if(unlocked) return;
+    try { if(audio){ audio.src = SILENT; unlocked = true; audio.play().catch(() => { unlocked = false; }); } } catch { unlocked = false; }
     try { const u = new scope.SpeechSynthesisUtterance(" "); u.volume = 0; scope.speechSynthesis.speak(u); } catch {}
   }
   // How long the subtitles take at rate 1 (same timing as the engine), so they can match the audio.
@@ -28,17 +28,25 @@
     return String(text).split(" ").reduce((t, w) => t + 85 + w.length*44 + (/,$/.test(w) ? 150 : /[.?!:]$/.test(w) ? 280 : 0), 0);
   }
   const cache = new Map();
+  const pending = new Map();
   async function fetchAudio(text){
     if(cache.has(text)) return cache.get(text);
-    const id = A()?.idToken?.();
-    const r = await scope.fetch(base() + "/tts", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ text, ...(id || {}) }) });
-    if(!r.ok || !/audio/.test(r.headers.get("Content-Type") || "")) throw new Error("tts " + r.status);
-    const url = URL.createObjectURL(await r.blob());
-    if(cache.size > 40){ const [k, v] = cache.entries().next().value; URL.revokeObjectURL(v); cache.delete(k); }
-    cache.set(text, url); return url;
+    if(pending.has(text)) return pending.get(text);
+    const task = (async () => {
+      const id = A()?.idToken?.();
+      const r = await scope.fetch(base() + "/tts", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ text, ...(id || {}) }) });
+      if(!r.ok || !/audio/.test(r.headers.get("Content-Type") || "")) {
+        const error = new Error("tts " + r.status); error.status = r.status; throw error;
+      }
+      const url = URL.createObjectURL(await r.blob());
+      if(cache.size > 40){ const [k, v] = cache.entries().next().value; URL.revokeObjectURL(v); cache.delete(k); }
+      cache.set(text, url); return url;
+    })();
+    pending.set(text, task);
+    try { return await task; } finally { pending.delete(text); }
   }
   // Ask for the next lines early so they start without a pause.
-  function prefetch(lines){ if(!ready() || muted()) return; lines.forEach(t => fetchAudio(t).catch(() => {})); }
+  function prefetch(lines){ if(!ready() || muted() || Date.now() < retryAfter) return; lines.forEach(t => fetchAudio(t).catch(markUnavailable)); }
 
   function phone(text){
     return new Promise(resolve => {
@@ -52,11 +60,18 @@
     });
   }
   let current = 0;
+  // If ElevenLabs exhausts its credits or rate limit, stay on the browser voice
+  // for this session; transient outages are retried after a short pause.
+  let retryAfter = 0;
+  function markUnavailable(error){
+    const quota = [402, 429].includes(error?.status);
+    retryAfter = Math.max(retryAfter, Date.now() + (quota ? 60*60*1000 : 30*1000));
+  }
   async function say(text, show){
     const t = String(text || "").trim(); if(!t) return;
     const my = ++current;
     if(muted()){ await show?.(t, 1); return; }
-    if(ready() && audio){
+    if(ready() && audio && Date.now() >= retryAfter){
       try {
         const url = await fetchAudio(t);
         if(my !== current) return;
@@ -67,8 +82,9 @@
         await audio.play();
         await Promise.all([show?.(t, Math.max(.6, subtitleMs(t)/(dur*.96))), ended]);
         return;
-      } catch { if(my !== current) return; }
+      } catch(error){ if(my !== current) return; markUnavailable(error); }
     }
+    if(my !== current) return;
     await Promise.all([show?.(t, 1), phone(t)]);
   }
   function stop(){ current++; try { audio?.pause(); } catch {} try { scope.speechSynthesis?.cancel(); } catch {} }

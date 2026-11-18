@@ -1,6 +1,7 @@
 /* ÓNIX first launch: introduce itself, connect the person's own email, learn their name,
    offer Calendar and Drive in one tap, then hand over to the orb.
-   Speaks with the phone's built-in voice, which is free; the ElevenLabs voice is saved for real conversations. */
+   ElevenLabs speaks first when the private ÓNIX voice service is available;
+   the phone speaks only if the premium service fails or reaches its limit. */
 (function (scope) {
   "use strict";
   const doc = scope.document;

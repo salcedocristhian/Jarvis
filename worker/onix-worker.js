@@ -12,7 +12,7 @@
 const DEFAULTS = {
   ALLOWED_ORIGIN: "https://salcedocristhian.github.io",
   AGENT_ID: "agent_9601m7c4t540fh6v6nadake0hsrp",
-  ADMIN_HASHES: "192415de7da4a638b541cfd10a9ae75cd79a2d52463f27ee4bfa0629cb4565f2",
+  ADMIN_HASHES: "192415de7da4a638b541cfd10a9ae75cd79a2d52463f27ee4bfa0629cb4565f2,27fba9e0eb60ca1e4d5e58362271243c9597f8aa7273a68a1ad9f554faa47472",
   GUEST_DAILY_SECONDS: "60",      // premium voice per guest per day
   GUEST_MONTH_SECONDS: "6000",    // all guests together per month (100 min). The rest of the plan stays for admins.
   PERMIT_DEPOSIT_SECONDS: "20",   // charged up front on every voice start, so skipped reports still cost something
@@ -140,7 +140,8 @@ async function tts(env, req, body){
   const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice.id)}?output_format=mp3_44100_64`, {
     method:"POST", headers:{ "xi-api-key":env.ELEVENLABS_API_KEY, "Content-Type":"application/json", Accept:"audio/mpeg" },
     body:JSON.stringify({ text, model_id:voice.model }) });
-  if(!r.ok) throw httpError(502, "ElevenLabs couldn't speak that.");
+  if(!r.ok) throw httpError([402, 429].includes(r.status) ? 429 : 502,
+    [402, 429].includes(r.status) ? "ElevenLabs voice is temporarily out of credits or requests." : "ElevenLabs couldn't speak that.");
   const buf = await r.arrayBuffer();
   await env.ONIX_KV.put(key, buf, { expirationTtl:2592000 });
   return new Response(buf, { headers:audioHeaders });
