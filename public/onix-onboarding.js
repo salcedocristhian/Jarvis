@@ -1,5 +1,5 @@
 /* ÓNIX first launch: introduce itself, connect the person's own email, learn their name,
-   offer Calendar and Drive in one tap, then hand over to the orb.
+   request Gmail, Calendar and Drive together with one Google consent, then hand over to the orb.
    Speaks with the phone's built-in voice, which is free; the ElevenLabs voice is saved for real conversations. */
 (function (scope) {
   "use strict";
@@ -74,11 +74,14 @@
     }
     const iconShown = eng.bigIcon("mail", n.mail);
     if(prov === "google") A().loadGoogle().catch(() => {});
-    await say(`${n.mail} it is. Tap the print to connect it. It's just you, me, and ${n.who}. Mostly ${n.who}.`);
+    await say(prov === "google"
+      ? "One Google sign-in can connect your Gmail, Calendar, and Drive in read-only mode. Google lets you choose what to share."
+      : `${n.mail} it is. Tap the print to connect it. It's just you, me, and ${n.who}. Mostly ${n.who}.`);
     await iconShown; eng.hideIcon();
     const res = await eng.confirmButton({
-      text:`Connect ${n.mail}`, status:`Checking with ${n.who}`, done:`${n.mail} connected`,
-      onTap: () => prov === "google" ? A().connectGoogle(["gmail"]) : A().connectMicrosoft(["outlook"], "onboard-mail")
+      text:prov === "google" ? "Connect Google · Gmail, Calendar, Drive" : `Connect ${n.mail}`,
+      status:`Checking with ${n.who}`, done:`${n.who} authorized`,
+      onTap: () => prov === "google" ? A().connectGoogleWorkspace() : A().connectMicrosoft(["outlook"], "onboard-mail")
     });
     await eng.clearSubs();
     if(!res.ok){
@@ -100,7 +103,20 @@
       return mailStep(prov);
     }
     await nickStep(p);
-    return extrasStep(prov, A().profile() || p);
+    return prov === "google" ? googleWorkspaceResult(A().profile() || p, result) : extrasStep(prov, A().profile() || p);
+  }
+  // Google permissions were already requested at the first tap: no second OAuth popup.
+  async function googleWorkspaceResult(p, result){
+    const ids = NAMES.google.ids;
+    const st = id => A().state(id) === "locked" ? "locked" : A().state(id) === "ready" || A().state(id) === "authorized" ? "on" : "off";
+    await eng.trio([{ icon:"mail", name:"Gmail", state:st(ids[0]) }, { icon:"cal", name:"Calendar", state:st(ids[1]) }, { icon:"folder", name:"Drive", state:st(ids[2]) }]);
+    if(!result.granted?.includes("gmail"))
+      await say("Google signed you in, but Gmail wasn't permitted. You can grant access later from Connections.");
+    else if(result.declined?.length)
+      await say("Gmail is connected. Calendar or Drive wasn't approved, so it stays off until you allow it in Connections.");
+    else await say("Gmail, Calendar, and Drive are connected. One account, read-only access, no extra setup screens.");
+    await eng.sleep(500); eng.hideTrio(); await eng.clearSubs();
+    return finish(p);
   }
   async function nickStep(p){
     if(!p.name) return;
@@ -191,7 +207,9 @@
   async function reconnect({ onDone } = {}){
     const p = A().profile(), prov = A().provider();
     if(!p || !prov || host) return false;
-    const ids = A().connectorsFor(prov).filter(c => c.state === "authorized").map(c => c.id);
+    const remembered = A().connectorsFor(prov).filter(c => c.state === "authorized").map(c => c.id);
+    const ids = prov === "google" && remembered.includes("gmail")
+      ? [...new Set([...A().GOOGLE_WORKSPACE_IDS, ...remembered])] : remembered;
     if(!ids.length) return false;
     onDoneCb = onDone;
     open("Reconnect"); await boot();

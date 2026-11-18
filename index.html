@@ -242,10 +242,10 @@ window.UNA_CONFIG = {
 <dialog class="sheet gmail-welcome" id="gmailWelcome" aria-labelledby="gmailWelcomeTitle">
   <div class="grab"></div>
   <p class="muted small">INICIO · GMAIL</p>
-  <h2 id="gmailWelcomeTitle">Conecta Gmail a Jarvis.</h2>
-  <p class="gmail-intro">Conecta tu cuenta con Google y podrás consultar tus correos con la voz de Jarvis, sin entrar a Ajustes.</p>
+  <h2 id="gmailWelcomeTitle">Conecta tu cuenta de Google a ÓNIX.</h2>
+  <p class="gmail-intro">Un permiso de Google para Gmail, Calendar y Drive (solo lectura). Tú eliges qué servicios autorizar.</p>
   <div class="welcome-actions">
-    <button class="btn primary" type="button" id="gmailWelcomeConnect">Conectar Gmail</button>
+    <button class="btn primary" type="button" id="gmailWelcomeConnect">Conectar Google</button>
     <button class="btn ghost" type="button" id="gmailWelcomeSkip">Ahora no</button>
   </div>
   <p class="muted small" id="gmailWelcomeStatus" role="status" aria-live="polite">Solo lectura. Google controla la autorización.</p>
@@ -287,13 +287,13 @@ window.UNA_CONFIG = {
     <label class="opt col">Llave de ElevenLabs TTS (opcional; no necesaria con ElevenAgents)<input id="kEleven" type="password" autocomplete="off"></label>
     <label class="opt col">Voice ID para TTS manual (opcional)<input id="kVoice" autocomplete="off"></label>
   </div>
-  <h2>Gmail (solo lectura).</h2>
-  <p class="muted small">Conecta tu cuenta directamente con Google. Jamás escribas tu contraseña aquí. Google solicitará tu autorización.</p>
+  <h2>Google · Gmail, Calendar y Drive (solo lectura).</h2>
+  <p class="muted small">Conecta los tres servicios en una sola autorización. Google solicitará tu permiso para cada uno. Jamás escribas tu contraseña aquí.</p>
   <label class="opt col">Google OAuth Client ID (público)
     <input id="gmailClientId" autocomplete="off" placeholder="123456789-abc.apps.googleusercontent.com">
   </label>
   <div class="btnrow">
-    <button class="btn primary" type="button" id="gmailConnect">Conectar Gmail con Google</button>
+    <button class="btn primary" type="button" id="gmailConnect">Conectar servicios de Google</button>
     <button class="btn ghost" type="button" id="gmailDisconnect">Desconectar Gmail</button>
   </div>
   <p class="muted small" id="gmailStatus">No conectado. Requiere OAuth Client ID web, Gmail API habilitada y autorización de Google. No guarda tokens entre sesiones.</p>
@@ -1353,10 +1353,22 @@ async function connectGmailFromButton() {
   gmailStatusEl.textContent = "Solicitando autorización directamente a Google…";
   gmailWelcomeStatus.textContent = "Conectando con Google…";
   try {
-    await gmailClient.connect(id);
-    gmailStatusEl.textContent = "Gmail autorizado solo para lectura en esta sesión. Puedes preguntar por tus correos.";
-    gmailWelcomeStatus.textContent = "Gmail conectado.";
-    if (gmailWelcome.open) gmailWelcome.close();
+    const accounts = window.OnixAccounts;
+    const useOnix = accounts && !/[?&]classic\b/.test(location.search) && id === window.ONIX_CONFIG?.google?.clientId;
+    if (useOnix) {
+      const result = await accounts.connectGoogleWorkspace();
+      applyProfile(result.profile);
+      const connected = result.granted.map(x => ({ gmail:"Gmail", gcal:"Calendar", gdrive:"Drive" })[x]).filter(Boolean);
+      gmailStatusEl.textContent = "Google autorizado: " + (connected.join(", ") || "ningún servicio de lectura") + ".";
+      gmailWelcomeStatus.textContent = gmailStatusEl.textContent;
+      if (result.granted.includes("gmail") && gmailWelcome.open) gmailWelcome.close();
+    } else {
+      // Classic mode and custom OAuth clients keep their historical Gmail-only behavior.
+      await gmailClient.connect(id);
+      gmailStatusEl.textContent = "Gmail autorizado solo para lectura en esta sesión.";
+      gmailWelcomeStatus.textContent = "Gmail conectado.";
+      if (gmailWelcome.open) gmailWelcome.close();
+    }
   } catch (e) {
     const message = "Gmail sin conectar: " + String(e.message || e).slice(0, 200);
     gmailStatusEl.textContent = message;
@@ -1371,8 +1383,11 @@ gmailSettingsConnect.addEventListener("click", connectGmailFromButton);
 gmailWelcomeConnect.addEventListener("click", connectGmailFromButton);
 $("#gmailWelcomeSkip").addEventListener("click", () => gmailWelcome.close());
 $("#gmailDisconnect").addEventListener("click", () => {
-  gmailClient.disconnect();
-  gmailStatusEl.textContent = "Gmail desconectado de esta sesión.";
+  if (window.OnixAccounts?.provider() === "google" && !/[?&]classic\b/.test(location.search)) {
+    // Preserve independently authorized Calendar/Drive scopes.
+    window.OnixAccounts.disconnect("gmail");
+  } else gmailClient.disconnect();
+  gmailStatusEl.textContent = "Gmail desconectado. Calendar y Drive conservan sus permisos si estaban conectados.";
   gmailWelcomeStatus.textContent = "Gmail desconectado. Conecta cuando quieras.";
   renderConns();
 });
