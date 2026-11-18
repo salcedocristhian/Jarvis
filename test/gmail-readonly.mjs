@@ -6,7 +6,7 @@ const html = await readFile(new URL("../index.html",import.meta.url),"utf8");
 assert.ok(html.includes('src="./public/gmail-readonly.js"'));
 assert.ok(html.includes('id="gmailConnect"'));
 assert.ok(html.includes('gmail_read: agentGmailRead'));
-assert.ok(html.includes('clientTools: { jobtread_read: agentJobTreadRead, gmail_read: agentGmailRead, web_research: agentWebResearch }'));
+assert.ok(html.includes('{ gmail_read: agentGmailRead }') && html.includes('{ jobtread_read: agentJobTreadRead }'));
 assert.ok(!src.includes("localStorage.setItem"));
 assert.ok(!src.includes("localStorage.getItem"));
 assert.ok(!src.includes("refresh_token"));

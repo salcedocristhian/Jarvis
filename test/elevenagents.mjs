@@ -9,7 +9,8 @@ assert.ok(root.includes('id="gmailWelcome"'));
 assert.ok(root.includes('id="gmailWelcomeConnect"'));
 assert.ok(root.includes('id="gmailWelcomeSkip"'));
 assert.ok(root.includes('gmailWelcome.showModal()'));
-assert.ok(root.includes('showGmailWelcomeOnLaunch(); boot();'));
+assert.ok(root.includes('onixLaunch().finally(boot);'));
+assert.ok(root.includes('return showGmailWelcomeOnLaunch();'), 'classic Gmail welcome stays as fallback');
 assert.ok(root.includes('agentClient?.preload?.().catch(() => {})'));
 assert.ok(root.includes('id="handsfreePanel" hidden'));
 assert.ok(root.includes('class="state sr"'));
@@ -18,7 +19,9 @@ assert.ok(root.includes('id="menuBtn"') && root.includes('id="setBtn"') && root.
 assert.ok(src.includes('function preload()'));
 
 assert.ok(root.includes('ElevenAgents · conversación (sin API Key)'));
-assert.ok(root.includes('clientTools: { jobtread_read: agentJobTreadRead, gmail_read: agentGmailRead, web_research: agentWebResearch }'));
+assert.ok(root.includes('...(admin ? { jobtread_read: agentJobTreadRead } : {})'), 'guests never get the JobTread tool');
+assert.ok(root.includes('window.OnixTools?.handlers() || { gmail_read: agentGmailRead }'));
+assert.ok(root.includes('dynamicVariables: onixVariables()'));
 assert.ok(root.includes('if (useAgentVoice()) startAgentVoice(q); else turn(q);'));
 assert.ok(root.includes('if (useAgentVoice()) {'));
 assert.ok(root.includes('if (handsfreePreferred) {'));
