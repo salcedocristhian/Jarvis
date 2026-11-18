@@ -63,3 +63,6 @@ Los job IDs van en Ajustes → Proyectos fijos (o `PINNED_JOBS` en el servidor),
 - Escribir (responder correo, contestar invitación) requiere el conector "Send & reply" y SIEMPRE pasa por `OnixHome.confirm`: texto exacto en pantalla, editable, botón Send, 6 s para deshacer, registro en "What ÓNIX did for you". Las herramientas del agente nunca envían; el resultado vuelve como nota `ACTION_RESULT`.
 - Servidor: `worker/onix-worker.js` (Cloudflare). Verifica identidad con el token de Google/Microsoft (no lo guarda), entrega el enlace privado de voz con presupuesto (día por invitado, mes para todos los invitados), IA gratis (Workers AI) con búsqueda Brave; Gemini solo de respaldo y sin datos personales. Llaves solo como secretos de Cloudflare.
 - Pruebas: `test/onix-data.mjs`, `test/onix-worker.mjs`.
+- Voz única: todo lo que ÓNIX dice fuera de la conversación pasa por `public/onix-voice.js` → `POST /tts` del worker (misma voz del agente, audio guardado en KV). La voz del teléfono es solo respaldo.
+- Bienvenida: un solo toque conecta correo, calendario y archivos del mismo proveedor.
+- Proyectos: `public/onix-projects.js` lee solo archivos de una lista fija de los repos públicos; acceso por hash de correo en `projects[].people`.

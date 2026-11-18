@@ -22,6 +22,14 @@
     });
   }
 
+  // ÓNIX's own voice (ElevenLabs through the server) with subtitles that end with it.
+  function speak(text){
+    if(!eng || !text) return Promise.resolve();
+    const gen = ++sayGen;
+    if(!scope.OnixVoice) return Promise.all([eng.say(text, { rate:1 }), freeVoice(text)]);
+    return scope.OnixVoice.say(String(text).slice(0, 600), (t, rate) => gen === sayGen && eng ? eng.say(t, { rate }) : null);
+  }
+
   /* ---------- mount ---------- */
   function mount(o = {}){
     if(host) return api;
@@ -37,7 +45,7 @@
     tapBtn.addEventListener("pointerdown", () => { held = false; pressT = setTimeout(() => { held = true; opts.onHold?.(); }, 550); });
     ["pointerup", "pointerleave", "pointercancel"].forEach(ev => tapBtn.addEventListener(ev, () => clearTimeout(pressT)));
     tapBtn.addEventListener("contextmenu", e => e.preventDefault());
-    tapBtn.addEventListener("click", () => { if(held) return; skipNow?.(); if(view !== "orb") orb(); opts.onTap?.(); });
+    tapBtn.addEventListener("click", () => { if(held) return; scope.OnixVoice?.unlock(); scope.OnixVoice?.stop(); skipNow?.(); if(view !== "orb") orb(); opts.onTap?.(); });
     requestAnimationFrame(loop);
     return api;
   }
@@ -79,7 +87,7 @@
     if(!eng) return;
     clearTimeout(idleTimer);
     const was = view; setView("orb");
-    if(was === "week") eng.hideWeek(); if(was === "list") eng.hideList(); eng.hideName();
+    if(was === "week") eng.hideWeek(); if(was === "list") eng.hideList(); if(was === "project") eng.clearScene(); eng.hideName();
     eng.spot.k = 0;
     await eng.become(state === "connecting" ? "think" : "orb", null, 800);
   }
@@ -120,6 +128,21 @@
   }
   async function showNumber(n, caption){ if(!eng) return; if(view === "list") eng.hideList(); setView("number"); await eng.nameplate(String(n), caption); scheduleIdle(8000); }
 
+  /* ---------- projects: the orb becomes the building ---------- */
+  const DERM_POS = [["a", -.95, .2], ["strainer", -.66, -.08], ["settling", -.22, .36], ["bags", .18, -.08], ["carbon", .5, .34], ["valve", .86, -.08]];
+  async function showProject(r){
+    if(!eng || !r?.ok) return;
+    if(view === "list") eng.hideList(); if(view === "week") eng.hideWeek(); eng.hideName();
+    setView("project");
+    const m = await scope.OnixProjects?.loadModels().catch(() => null);
+    if(m?.tower) eng.setData("tower", m.tower); if(m?.site) eng.setData("site", m.site);
+    if(r.scene === "tower" && m?.tower) await eng.tower("Piso 2", { title:"Floor 2", sub:"pilot floor" });
+    else if(r.scene === "derm") await eng.derm(r.stages.map((t, i) => { const [k, x, y] = DERM_POS[i] || ["s" + i, 0, 0]; const [a, b] = t.split(": "); return [k, x, y, a, b || ""]; }), 1100);
+    else if(r.scene === "site" && m?.site) await eng.site();
+    else { setView("list"); await eng.list([{ title:r.project, meta:"README · GitHub", hot:true }]); }
+    scheduleIdle(30000);
+  }
+
   /* ---------- morning brief ---------- */
   let skipNow = null;
   async function brief(){
@@ -127,7 +150,7 @@
     const p = A().provider(), id = p === "google" ? ["gmail", "gcal"] : ["outlook", "mscal"];
     if(!id.some(x => A().state(x) === "ready")) return false;
     let skipped = false; skipNow = () => { skipped = true; scope.speechSynthesis?.cancel?.(); };
-    const say = t => skipped ? null : Promise.all([eng.say(t, { rate:1 }), freeVoice(t)]);
+    const say = t => skipped ? null : speak(t);
     const name = A().callName(), h = new Date().getHours();
     const hello = h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Evening";
     let mail = null, events = [], invites = 0;
@@ -215,6 +238,6 @@
   }
 
   function destroy(){ clearTimeout(idleTimer); eng?.destroy(); host?.remove(); eng = null; host = null; scope.removeEventListener("resize", place); }
-  const api = { mount, setState, heard, reply, showMail, showFiles, showWeek, showNumber, orb, brief, confirm, freeVoice, destroy, get mounted(){ return Boolean(host); } };
+  const api = { mount, setState, heard, reply, speak, showMail, showFiles, showWeek, showNumber, showProject, orb, brief, confirm, freeVoice, destroy, get mounted(){ return Boolean(host); } };
   scope.OnixHome = Object.freeze(api);
 })(globalThis);

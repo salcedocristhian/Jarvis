@@ -86,12 +86,7 @@
       p.then(v => { status.textContent = v.declined?.length ? "Connected, except what you left unchecked." : `${c.name} connected.`; rerender(); },
              e => { status.textContent = String(e?.message || e); rerender(); });
     };
-    const sameProvider = () => {
-      const remembered = A().connectorsFor(prov).filter(x => x.state === "authorized" || x.state === "ready" || x.id === c.id).map(x => x.id);
-      // The main Gmail button connects the full read-only Google trio, unless a service is locked.
-      return prov === "google" && c.id === "gmail"
-        ? [...new Set([...A().GOOGLE_WORKSPACE_IDS, ...remembered])] : remembered;
-    };
+    const sameProvider = () => A().connectorsFor(prov).filter(x => x.state === "authorized" || x.state === "ready" || x.id === c.id).map(x => x.id);
     if(c.state === "ready"){ btn("Disconnect", "", () => { A().disconnect(c.id); status.textContent = `${c.name} disconnected.`; rerender(); });
       btn("Lock", "", () => { A().disconnect(c.id); A().lock(c.id); status.textContent = `${c.name} locked. ÓNIX won't ask for it.`; rerender(); }); }
     else if(c.state === "authorized") btn("Reconnect", "primary", () => connect(sameProvider()));

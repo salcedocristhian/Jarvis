@@ -15,6 +15,14 @@ window.ONIX_CONFIG = {
     // "common" accepts work accounts from any company and personal Outlook accounts.
     tenant: "common"
   },
+  // Project repos ÓNIX can talk about (read-only, from GitHub). Admins see all.
+  // people: SHA-256 of each person's email who may ask about that project (same command as adminEmailHashes).
+  projects: [
+    { id:"5660", name:"5660 Collins", repo:"5660-collins-app", aliases:["collins", "5660"], people:[] },
+    { id:"barcelona", name:"Barcelona Gardens", repo:"Barcelona", aliases:["barcelona"], people:[] },
+    { id:"gorilla", name:"Gorilla Screens", repo:"Gorilla-Screens", aliases:["gorilla"], people:[] },
+    { id:"kingfisher", name:"19984 Kingfisher Lane", repo:"19984-Kingfisher-Lane-App", aliases:["kingfisher", "19984"], people:[] }
+  ],
   worker: {
     // Your ÓNIX server on Cloudflare, e.g. "https://onix.your-name.workers.dev". Empty = phase 1 behavior.
     url: ""

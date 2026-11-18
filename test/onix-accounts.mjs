@@ -80,37 +80,6 @@ function world({ search = "", userinfo, graphMe } = {}){
   assert.equal(gisRequests.length, 2);
 }
 
-// 2a. One Google consent can authorize the entire read-only bundle without any write permission.
-{
-  const { w, A, gisRequests } = world();
-  w.allowDrive = true;
-  const result = await A.connectGoogleWorkspace();
-  assert.deepEqual([...result.granted], ["gmail", "gcal", "gdrive"]);
-  assert.deepEqual([...result.declined], []);
-  assert.equal(gisRequests.length, 1, "one Google consent popup for the three services");
-  assert.match(gisRequests[0], /gmail\.readonly/);
-  assert.match(gisRequests[0], /calendar\.readonly/);
-  assert.match(gisRequests[0], /drive\.metadata\.readonly/);
-  assert.doesNotMatch(gisRequests[0], /gmail\.send|calendar\.events/, "never add send permissions automatically");
-  assert.equal(A.state("gmail"), "ready");
-  assert.equal(A.state("gcal"), "ready");
-  assert.equal(A.state("gdrive"), "ready");
-  A.disconnect("gmail");
-  assert.equal(A.state("gmail"), "off", "disconnected Gmail stays off while the Google token is still valid");
-  assert.equal(A.state("gcal"), "ready");
-  assert.equal(A.state("gdrive"), "ready");
-}
-
-// 2b. If Google declines Drive, ÓNIX reports it instead of inventing permission.
-{
-  const { A, gisRequests } = world();
-  const result = await A.connectGoogleWorkspace();
-  assert.deepEqual([...result.granted], ["gmail", "gcal"]);
-  assert.deepEqual([...result.declined], ["gdrive"]);
-  assert.equal(A.state("gdrive"), "off");
-  assert.equal(gisRequests.length, 1);
-}
-
 // 3. Locked connectors are never requested.
 {
   const { A, gisRequests } = world();

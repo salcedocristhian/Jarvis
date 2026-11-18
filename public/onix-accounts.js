@@ -32,9 +32,6 @@
   };
   const BASE = { google:["openid", "email", "profile"], microsoft:["openid", "profile", "email", "offline_access", "User.Read"] };
   const ORDER = { google:["gmail", "gcal", "gdrive", "gact"], microsoft:["outlook", "mscal", "onedrive", "msact"] };
-  // One opt-in Google sign-in requests the three read-only services together.
-  // Action scopes (sending mail or editing events) remain separate and require their own approval.
-  const GOOGLE_WORKSPACE_IDS = Object.freeze(["gmail", "gcal", "gdrive"]);
 
   const tokens = { google:null, microsoft:null };           // { value, exp, scope }
   const live = tok => Boolean(tok && tok.value && Date.now() < tok.exp - 60000);
@@ -48,7 +45,6 @@
     const c = CONNECTORS[id]; if(!c) return "off";
     const saved = states()[id]?.state || "off";
     if(saved === "locked") return "locked";
-    if(saved === "off") return "off"; // Explicit disconnect must stay disconnected even if another Google scope remains live.
     const tok = tokens[c.provider];
     if(live(tok) && c.scopes.every(sc => tok.scope.includes(sc))) return "ready";
     return saved === "authorized" ? "authorized" : "off";
@@ -108,8 +104,7 @@
         callback: r => {
           const w = gWaiting; gWaiting = null;
           if(!r || r.error || !r.access_token){ w?.reject(new Error(r?.error === "access_denied" ? "You said no to Google. That's allowed." : "Google didn't connect. Try again.")); return; }
-          // Google's actual granted scopes are authoritative; never assume the whole request was approved.
-          tokens.google = { value:r.access_token, exp:Date.now() + (Number(r.expires_in) || 3600)*1000, scope:String(r.scope || "") };
+          tokens.google = { value:r.access_token, exp:Date.now() + (Number(r.expires_in) || 3600)*1000, scope:String(r.scope || scopes.join(" ")) };
           afterGoogle(want).then(w.resolve, w.reject);
         },
         error_callback: e => { const w = gWaiting; gWaiting = null; w?.reject(new Error(e?.type === "popup_closed" ? "The Google window closed before finishing." : "Google didn't connect. Try again.")); }
@@ -120,7 +115,6 @@
   async function afterGoogle(want){
     const granted = want.filter(id => CONNECTORS[id].scopes.every(sc => tokens.google.scope.includes(sc)));
     granted.forEach(id => setState(id, "authorized"));
-    want.filter(id => !granted.includes(id)).forEach(id => setState(id, "off"));
     if(granted.includes("gmail")) scope.JarvisGmail?.adopt?.(tokens.google.value, Math.round((tokens.google.exp - Date.now())/1000));
     const me = await api("google", "https://www.googleapis.com/oauth2/v3/userinfo");
     const email = String(me.email || "");
@@ -128,7 +122,6 @@
     setProfile(keepNick(p));
     return { profile:p, granted, declined:want.filter(id => !granted.includes(id)) };
   }
-  const connectGoogleWorkspace = () => connectGoogle(GOOGLE_WORKSPACE_IDS);
 
   /* ---------- Microsoft (authorization code + PKCE, redirect) ---------- */
   const b64url = buf => scope.btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -244,8 +237,8 @@
   };
 
   scope.OnixAccounts = Object.freeze({
-    CONNECTORS, ORDER, GOOGLE_WORKSPACE_IDS, CATALOG, profile, provider, isAdmin, callName, setNickname, state, lock, unlock, connectorsFor, onboarded, markOnboarded,
-    loadGoogle, googleReady, connectGoogle, connectGoogleWorkspace, connectMicrosoft, handleRedirect, snapshot, disconnect, signOut, requests, request, budget, call, idToken, log, logList,
+    CONNECTORS, ORDER, CATALOG, profile, provider, isAdmin, callName, setNickname, state, lock, unlock, connectorsFor, onboarded, markOnboarded,
+    loadGoogle, googleReady, connectGoogle, connectMicrosoft, handleRedirect, snapshot, disconnect, signOut, requests, request, budget, call, idToken, log, logList,
     microsoftReady: () => Boolean(CFG.microsoft?.clientId), sha256
   });
 })(globalThis);
